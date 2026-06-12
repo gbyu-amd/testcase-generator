@@ -70,15 +70,21 @@ Agent 会自动：
 ## 脚本命令
 
 ```bash
-# 校验生成用例（默认读取 outputs/origin_exports/）
-python scripts/validate_cases.py
+# 校验本次生成的用例（推荐显式指定输出文件）
+python scripts/validate_cases.py --source outputs/origin_exports/<module_name>_testcases.md
 
-# 导出 Excel（默认读取 outputs/origin_exports/）
-python scripts/export_testcases.py
+# 导出 Excel（校验通过后执行）
+python scripts/export_testcases.py --source outputs/origin_exports/<module_name>_testcases.md
+
+# 导出并清理历史 xlsx，仅保留本次文件
+python scripts/export_testcases.py --source outputs/origin_exports/<module_name>_testcases.md --clean
 
 # 如需校验参考用例库，显式指定 source
 python scripts/validate_cases.py --source testcase_templates/modules
 ```
+
+> 不带 `--source` 时脚本会默认全量扫描 `outputs/origin_exports/` 下所有用例文件；
+> 单模块生成时建议显式指定文件，避免误把其他模块用例一并校验或导出。
 
 如果 PowerShell 中文路径输出异常，运行前设置：
 

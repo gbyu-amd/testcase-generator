@@ -31,6 +31,26 @@ EXPECTED_HEADERS = [
 
 VALID_PRIORITIES = {"P0", "P1", "P2"}
 
+# 编号中使用的类型，对应规则文件 testcase_id_rules.md
+VALID_ID_TYPES = ["功能", "异常", "边界", "权限", "回归", "兼容", "联动"]
+
+# 编号类型与用例类型字段的对应关系：
+# 编号里"正常业务流程"写作"功能"，而用例类型字段写作"正向"，其余一致。
+ID_TYPE_TO_CASE_TYPE = {
+    "功能": "正向",
+    "异常": "异常",
+    "边界": "边界",
+    "权限": "权限",
+    "回归": "回归",
+    "兼容": "兼容",
+    "联动": "联动",
+}
+
+# 用例编号格式：模块名-类型-三位序号，例如 登录-功能-001
+CASE_ID_PATTERN = re.compile(
+    r"^(?P<module>[^-]+)-(?P<type>" + "|".join(VALID_ID_TYPES) + r")-(?P<seq>\d{3})$"
+)
+
 
 def configure_output_encoding() -> None:
     for stream in (sys.stdout, sys.stderr):

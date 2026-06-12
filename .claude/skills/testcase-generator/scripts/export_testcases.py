@@ -233,7 +233,23 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         action="store_true",
         help="发现 ERROR 或 WARN 时都停止导出；默认只在 ERROR 时停止",
     )
+    parser.add_argument(
+        "--clean",
+        action="store_true",
+        help="导出成功后清理 outputs/excel_exports/ 下的历史 xlsx，仅保留本次导出文件",
+    )
     return parser.parse_args(argv)
+
+
+def clean_old_exports(output_dir: Path, keep: Path) -> list[Path]:
+    keep = keep.resolve()
+    removed: list[Path] = []
+    for existing in output_dir.glob("*.xlsx"):
+        if existing.resolve() == keep:
+            continue
+        existing.unlink()
+        removed.append(existing)
+    return removed
 
 
 def build_output_path(output_arg: str | None, output_dir: Path) -> Path:
@@ -255,7 +271,9 @@ def main(argv: list[str]) -> int:
         has_blocking_issues,
         text_issue,
         validate_case_rows,
+        validate_core_flow_coverage,
         validate_duplicates,
+        validate_id_sequence,
     )
 
     root = project_root()
@@ -294,6 +312,8 @@ def main(argv: list[str]) -> int:
     ]
     validation_issues.extend(validate_case_rows(cases))
     validation_issues.extend(validate_duplicates(cases))
+    validation_issues.extend(validate_id_sequence(cases))
+    validation_issues.extend(validate_core_flow_coverage(cases))
 
     if validation_issues:
         print("导出前校验结果：")
@@ -309,11 +329,17 @@ def main(argv: list[str]) -> int:
 
     write_xlsx(output_path, cases)
 
+    removed_files: list[Path] = []
+    if args.clean:
+        removed_files = clean_old_exports(output_dir, output_path)
+
     modules = sorted({case["功能模块"] for case in cases if case["功能模块"]})
     print("已导出测试用例 Excel：")
     print(f"- 文件路径：{output_path}")
     print(f"- 用例数量：{len(cases)}")
     print(f"- 覆盖模块：{', '.join(modules)}")
+    if args.clean:
+        print(f"- 已清理历史文件：{len(removed_files)} 个")
     return 0
 
 

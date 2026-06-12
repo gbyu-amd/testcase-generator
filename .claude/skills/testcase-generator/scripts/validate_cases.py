@@ -47,7 +47,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from case_utils import (
+    CASE_ID_PATTERN,
     EXPECTED_HEADERS,
+    ID_TYPE_TO_CASE_TYPE,
+    VALID_ID_TYPES,
     VALID_PRIORITIES,
     build_source_path,
     configure_output_encoding,
@@ -68,7 +71,40 @@ VAGUE_EXPECTATION_PATTERNS = [
     re.compile(r"^结果正确[。.]?$"),
     re.compile(r"^按需求展示[。.]?$"),
     re.compile(r"^显示正确[。.]?$"),
+    re.compile(r"^展示成功[。.]?$"),
+    re.compile(r"^操作成功[。.]?$"),
+    re.compile(r"^操作完成[。.]?$"),
+    re.compile(r"^符合预期[。.]?$"),
+    re.compile(r"^正常显示[。.]?$"),
+    re.compile(r"^展示正确[。.]?$"),
+    re.compile(r"^正常展示[。.]?$"),
+    re.compile(r"^页面正常[。.]?$"),
+    re.compile(r"^成功[。.]?$"),
+    re.compile(r"^通过[。.]?$"),
 ]
+
+# 预期结果建议的最少字符数，过短通常说明缺少可验证的页面/数据/业务状态描述
+MIN_EXPECTATION_LENGTH = 10
+
+# 核心交易链路模块需要覆盖的关键场景关键词（任一同义词命中即算覆盖）
+CORE_FLOW_KEYWORDS = {
+    "登录": [
+        ["登录态", "登录失效", "登录过期", "token过期", "token 过期"],
+        ["未登录"],
+        ["多页签", "多tab", "多 tab", "页签"],
+    ],
+    "购物车": [
+        ["库存"],
+        ["失效商品", "商品失效", "下架"],
+        ["金额", "合计", "优惠"],
+    ],
+    "结算下单": [
+        ["重复提交", "重复点击", "重复下单", "重复订单"],
+        ["库存"],
+        ["价格变化", "价格变动", "价格"],
+        ["地址"],
+    ],
+}
 
 
 @dataclass
@@ -243,6 +279,10 @@ def is_vague_expectation(value: str) -> bool:
     return any(pattern.match(normalized) for pattern in VAGUE_EXPECTATION_PATTERNS)
 
 
+def is_too_short_expectation(value: str) -> bool:
+    return len("".join(value.split())) < MIN_EXPECTATION_LENGTH
+
+
 def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
     issues: list[Issue] = []
 
@@ -282,6 +322,33 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                 )
             )
 
+        case_id = case["用例编号"]
+        id_match = CASE_ID_PATTERN.match(case_id) if case_id else None
+        if case_id and not id_match:
+            issues.append(
+                case_issue(
+                    case,
+                    "ERROR",
+                    "invalid_case_id_format",
+                    f"用例编号格式不正确：{case_id}，应为 模块名-类型-三位序号，"
+                    f"类型取值 {', '.join(VALID_ID_TYPES)}，例如 登录-功能-001",
+                    "用例编号",
+                )
+            )
+        elif id_match and case_type:
+            expected_case_type = ID_TYPE_TO_CASE_TYPE.get(id_match.group("type"))
+            if expected_case_type and expected_case_type != case_type:
+                issues.append(
+                    case_issue(
+                        case,
+                        "ERROR",
+                        "case_id_type_mismatch",
+                        f"编号类型“{id_match.group('type')}”应对应用例类型“{expected_case_type}”，"
+                        f"但用例类型为“{case_type}”",
+                        "用例类型",
+                    )
+                )
+
         steps = case["操作步骤"]
         if steps and not re.search(r"(^|\n|<br\s*/?>)\s*\d+[.、]", steps, re.IGNORECASE):
             issues.append(
@@ -303,6 +370,75 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     "vague_expectation",
                     f"预期结果过于空泛：{expectation}",
                     "预期结果",
+                )
+            )
+        elif expectation and is_too_short_expectation(expectation):
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "short_expectation",
+                    f"预期结果过短，建议补充页面表现、数据状态或业务状态：{expectation}",
+                    "预期结果",
+                )
+            )
+
+    return issues
+
+
+def validate_id_sequence(cases: list[dict[str, str]]) -> list[Issue]:
+    """同模块同类型下三位序号应从 001 连续递增，缺号或不从 001 开始时给出 WARN。"""
+    issues: list[Issue] = []
+    grouped: dict[tuple[str, str], list[tuple[int, dict[str, str]]]] = {}
+
+    for case in cases:
+        match = CASE_ID_PATTERN.match(case["用例编号"] or "")
+        if not match:
+            continue
+        key = (match.group("module"), match.group("type"))
+        grouped.setdefault(key, []).append((int(match.group("seq")), case))
+
+    for (module, id_type), entries in grouped.items():
+        sequences = sorted(seq for seq, _ in entries)
+        expected = list(range(1, len(sequences) + 1))
+        if sequences != expected:
+            missing = sorted(set(expected) - set(sequences))
+            missing_text = "、".join(f"{value:03d}" for value in missing)
+            issues.append(
+                text_issue(
+                    "WARN",
+                    "non_continuous_id_sequence",
+                    f"{module}-{id_type} 编号序号不连续，缺少：{missing_text or '（起始号或顺序异常）'}",
+                )
+            )
+
+    return issues
+
+
+def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
+    """核心交易链路模块应覆盖约定的关键场景关键词，缺失时给出 WARN。"""
+    issues: list[Issue] = []
+    modules_present = {case["功能模块"] for case in cases if case["功能模块"]}
+
+    for module, keyword_groups in CORE_FLOW_KEYWORDS.items():
+        if module not in modules_present:
+            continue
+        module_text = "".join(
+            f"{case['测试场景']}{case['前置条件']}{case['操作步骤']}{case['预期结果']}".lower()
+            for case in cases
+            if case["功能模块"] == module
+        )
+        missing_groups = [
+            groups[0]
+            for groups in keyword_groups
+            if not any(keyword.lower() in module_text for keyword in groups)
+        ]
+        if missing_groups:
+            issues.append(
+                text_issue(
+                    "WARN",
+                    "core_flow_coverage_gap",
+                    f"核心链路模块“{module}”疑似缺少关键场景覆盖：{'、'.join(missing_groups)}",
                 )
             )
 
@@ -509,6 +645,8 @@ def main(argv: list[str]) -> int:
 
     issues.extend(validate_case_rows(cases))
     issues.extend(validate_duplicates(cases))
+    issues.extend(validate_id_sequence(cases))
+    issues.extend(validate_core_flow_coverage(cases))
 
     if args.json:
         print_json_report(case_files, cases, issues, fixes)
