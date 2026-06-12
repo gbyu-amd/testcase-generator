@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import html
-import os
 import re
 import sys
 from pathlib import Path
@@ -63,9 +62,13 @@ def project_root() -> Path:
 
 
 def is_under(path: Path, root: Path) -> bool:
-    path = path.resolve()
-    root = root.resolve()
-    return os.path.commonpath([str(path), str(root)]) == str(root)
+    # 使用 Path.is_relative_to() 进行路径包含判断，在 Windows 大小写不敏感
+    # 的文件系统上也能正确处理大小写不一致的路径（Python 3.9+）。
+    try:
+        path.resolve().relative_to(root.resolve())
+        return True
+    except ValueError:
+        return False
 
 
 def ensure_under(path: Path, root: Path, label: str) -> Path:
@@ -111,8 +114,8 @@ def is_separator_row(cells: Iterable[str]) -> bool:
 
 def normalize_cell(value: str) -> str:
     value = html.unescape(value.strip())
+    # <br\s*/?> 的正则已能匹配所有变体（<br>、<br/>、<br />），无需额外 replace
     value = re.sub(r"<br\s*/?>", "\n", value, flags=re.IGNORECASE)
-    value = value.replace("<br />", "\n")
     return value.strip()
 
 
@@ -141,6 +144,9 @@ def parse_case_file(path: Path) -> tuple[list[dict[str, str]], list[str]]:
             if is_separator_row(separator_cells):
                 index += 1
 
+        # 遇到非表格行时停止当前表格的解析；外层 while 循环会继续向下
+        # 扫描，因此同一文件中的多张表格（如追加记录、需求覆盖率对照表）
+        # 都能被正确识别和解析。
         while index < len(lines):
             row_line = lines[index]
             if not row_line.strip().startswith("|"):
@@ -176,6 +182,9 @@ def discover_case_files(source: Path) -> list[Path]:
     if source.is_file():
         return [source]
     if source.is_dir():
+        # 仅匹配以 _testcases.md 结尾的文件，带时间戳的"另存"文件
+        # （如 login_testcases_20260613.md）不在默认扫描范围内，需要
+        # 通过 --source 显式指定才能被处理。
         case_files = set(source.rglob("*_testcases.md"))
         case_files.update(source.rglob("testcases.md"))
         return sorted(case_files)

@@ -47,8 +47,22 @@ from case_utils import (
     parse_case_file,
     project_root,
 )
+from validate_cases import (
+    format_issue,
+    has_blocking_issues,
+    text_issue,
+    validate_case_rows,
+    validate_core_flow_coverage,
+    validate_duplicates,
+    validate_id_sequence,
+)
 
 INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
+
+# Excel 样式索引（对应 styles_xml 中 cellXfs 的顺序）
+_STYLE_DEFAULT = 0   # 未使用的默认样式占位
+_STYLE_HEADER = 1    # 表头：加粗、绿色背景、居中
+_STYLE_DATA = 2      # 数据行：带边框、顶部对齐、自动换行
 
 
 def column_name(index: int) -> str:
@@ -86,9 +100,9 @@ def worksheet_xml(headers: list[str], cases: list[dict[str, str]]) -> str:
     max_row = len(cases) + 1
     max_col = len(headers)
     dimension = f"A1:{column_name(max_col)}{max_row}"
-    rows = [row_xml(1, headers, 1)]
+    rows = [row_xml(1, headers, _STYLE_HEADER)]
     rows.extend(
-        row_xml(row_index, [case[header] for header in headers], 2)
+        row_xml(row_index, [case[header] for header in headers], _STYLE_DATA)
         for row_index, case in enumerate(cases, start=2)
     )
 
@@ -247,8 +261,12 @@ def clean_old_exports(output_dir: Path, keep: Path) -> list[Path]:
     for existing in output_dir.glob("*.xlsx"):
         if existing.resolve() == keep:
             continue
-        existing.unlink()
-        removed.append(existing)
+        try:
+            existing.unlink()
+            removed.append(existing)
+        except OSError as exc:
+            # 文件可能被 Excel 等进程占用，跳过并提示，不中断导出流程
+            print(f"警告：无法删除历史文件 {existing}：{exc}", file=sys.stderr)
     return removed
 
 
@@ -266,16 +284,6 @@ def build_output_path(output_arg: str | None, output_dir: Path) -> Path:
 
 def main(argv: list[str]) -> int:
     configure_output_encoding()
-    from validate_cases import (
-        format_issue,
-        has_blocking_issues,
-        text_issue,
-        validate_case_rows,
-        validate_core_flow_coverage,
-        validate_duplicates,
-        validate_id_sequence,
-    )
-
     root = project_root()
     output_dir = root / "outputs" / "excel_exports"
     args = parse_args(argv)

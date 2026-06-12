@@ -158,7 +158,11 @@ def format_issue(issue: Issue) -> str:
 
 
 def has_blocking_issues(issues: list[Issue], strict: bool = False) -> bool:
-    return any(issue.severity == "ERROR" or strict for issue in issues)
+    # strict=True 时 WARN 也视为阻塞；将来若新增 INFO 等级别，此处不会误判。
+    return any(
+        issue.severity == "ERROR" or (strict and issue.severity == "WARN")
+        for issue in issues
+    )
 
 
 def escape_markdown_cell(value: str) -> str:
@@ -179,6 +183,7 @@ def markdown_separator() -> str:
 
 
 def fix_case_file(path: Path) -> dict[str, object]:
+    # 统一以无 BOM 的 utf-8 读写，去除 BOM 是有意为之，保证后续处理的一致性。
     original_text = path.read_text(encoding="utf-8-sig")
     lines = original_text.splitlines()
     updated_lines: list[str] = []
@@ -387,20 +392,25 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
 
 
 def validate_id_sequence(cases: list[dict[str, str]]) -> list[Issue]:
-    """同模块同类型下三位序号应从 001 连续递增，缺号或不从 001 开始时给出 WARN。"""
+    """同模块同类型下三位序号应自身连续（无跳号），检测到跳号时给出 WARN。
+
+    注意：追加模式下编号不从 001 开始属于正常情况，此处只检查序号是否有
+    跳号（如 001、002、004 缺少 003），不要求必须从 001 起始。
+    """
     issues: list[Issue] = []
-    grouped: dict[tuple[str, str], list[tuple[int, dict[str, str]]]] = {}
+    grouped: dict[tuple[str, str], list[int]] = {}
 
     for case in cases:
         match = CASE_ID_PATTERN.match(case["用例编号"] or "")
         if not match:
             continue
         key = (match.group("module"), match.group("type"))
-        grouped.setdefault(key, []).append((int(match.group("seq")), case))
+        grouped.setdefault(key, []).append(int(match.group("seq")))
 
-    for (module, id_type), entries in grouped.items():
-        sequences = sorted(seq for seq, _ in entries)
-        expected = list(range(1, len(sequences) + 1))
+    for (module, id_type), sequences in grouped.items():
+        sequences = sorted(sequences)
+        # 期望序列：从实际最小序号连续递增到最小序号 + 数量 - 1
+        expected = list(range(sequences[0], sequences[0] + len(sequences)))
         if sequences != expected:
             missing = sorted(set(expected) - set(sequences))
             missing_text = "、".join(f"{value:03d}" for value in missing)
@@ -408,7 +418,7 @@ def validate_id_sequence(cases: list[dict[str, str]]) -> list[Issue]:
                 text_issue(
                     "WARN",
                     "non_continuous_id_sequence",
-                    f"{module}-{id_type} 编号序号不连续，缺少：{missing_text or '（起始号或顺序异常）'}",
+                    f"{module}-{id_type} 编号序号存在跳号，缺少：{missing_text}",
                 )
             )
 
