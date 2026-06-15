@@ -19,8 +19,8 @@
     - 是否存在标准测试用例表格
     - 字段是否完整
     - 优先级是否只使用 P0、P1、P2
-    - 用例类型是否在约定范围内
-    - 用例编号是否重复
+    - 生成用例的备注是否写明来源
+    - 生成用例的是否自动化、关联接口、用例测试类、关联项目是否留空
     - 测试场景是否重复
     - 操作步骤和预期结果是否过于空泛
 
@@ -47,10 +47,8 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from case_utils import (
-    CASE_ID_PATTERN,
     EXPECTED_HEADERS,
-    ID_TYPE_TO_CASE_TYPE,
-    VALID_ID_TYPES,
+    REQUIRED_HEADERS,
     VALID_PRIORITIES,
     build_source_path,
     configure_output_encoding,
@@ -64,7 +62,6 @@ from case_utils import (
 )
 
 
-VALID_CASE_TYPES = {"正向", "异常", "边界", "权限", "回归", "兼容", "联动"}
 VAGUE_EXPECTATION_PATTERNS = [
     re.compile(r"^页面展示正常[。.]?$"),
     re.compile(r"^功能可用[。.]?$"),
@@ -85,6 +82,9 @@ VAGUE_EXPECTATION_PATTERNS = [
 
 # 预期结果建议的最少字符数，过短通常说明缺少可验证的页面/数据/业务状态描述
 MIN_EXPECTATION_LENGTH = 10
+
+INVALID_SOURCE_REMARKS = {"", "无", "待填", "来源：待填"}
+EMPTY_GENERATED_HEADERS = ["是否自动化", "关联接口", "用例测试类", "关联项目"]
 
 # 核心交易链路模块需要覆盖的关键场景关键词（任一同义词命中即算覆盖）
 CORE_FLOW_KEYWORDS = {
@@ -120,6 +120,15 @@ class Issue:
 
 def case_location(case: dict[str, str]) -> str:
     return f"{case['_source_file']} 第 {case['_source_line']} 行"
+
+
+def case_group(case: dict[str, str]) -> str:
+    groups = [
+        case.get("一级分组", ""),
+        case.get("二级分组", ""),
+        case.get("三级分组", ""),
+    ]
+    return " / ".join(group for group in groups if group) or "未分组"
 
 
 def case_issue(
@@ -288,11 +297,30 @@ def is_too_short_expectation(value: str) -> bool:
     return len("".join(value.split())) < MIN_EXPECTATION_LENGTH
 
 
+def requires_source_remark(case: dict[str, str]) -> bool:
+    source_file = case.get("_source_file", "")
+    if not source_file:
+        return False
+
+    try:
+        Path(source_file).resolve().relative_to(
+            (project_root() / "outputs" / "origin_exports").resolve()
+        )
+        return True
+    except ValueError:
+        return False
+
+
+def has_valid_source_remark(value: str) -> bool:
+    normalized = value.strip()
+    return normalized not in INVALID_SOURCE_REMARKS and "来源：" in normalized
+
+
 def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
     issues: list[Issue] = []
 
     for case in cases:
-        missing_fields = [header for header in EXPECTED_HEADERS if not case[header]]
+        missing_fields = [header for header in REQUIRED_HEADERS if not case[header]]
         if missing_fields:
             issues.append(
                 case_issue(
@@ -315,56 +343,44 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                 )
             )
 
-        case_type = case["用例类型"]
-        if case_type and case_type not in VALID_CASE_TYPES:
-            issues.append(
-                case_issue(
-                    case,
-                    "ERROR",
-                    "invalid_case_type",
-                    f"用例类型为 {case_type}，应为 {', '.join(sorted(VALID_CASE_TYPES))}",
-                    "用例类型",
-                )
-            )
-
-        case_id = case["用例编号"]
-        id_match = CASE_ID_PATTERN.match(case_id) if case_id else None
-        if case_id and not id_match:
-            issues.append(
-                case_issue(
-                    case,
-                    "ERROR",
-                    "invalid_case_id_format",
-                    f"用例编号格式不正确：{case_id}，应为 模块名-类型-三位序号，"
-                    f"类型取值 {', '.join(VALID_ID_TYPES)}，例如 登录-功能-001",
-                    "用例编号",
-                )
-            )
-        elif id_match and case_type:
-            expected_case_type = ID_TYPE_TO_CASE_TYPE.get(id_match.group("type"))
-            if expected_case_type and expected_case_type != case_type:
-                issues.append(
-                    case_issue(
-                        case,
-                        "ERROR",
-                        "case_id_type_mismatch",
-                        f"编号类型“{id_match.group('type')}”应对应用例类型“{expected_case_type}”，"
-                        f"但用例类型为“{case_type}”",
-                        "用例类型",
-                    )
-                )
-
-        steps = case["操作步骤"]
+        steps = case["用例步骤"]
         if steps and not re.search(r"(^|\n|<br\s*/?>)\s*\d+[.、]", steps, re.IGNORECASE):
             issues.append(
                 case_issue(
                     case,
                     "WARN",
                     "unordered_steps",
-                    "操作步骤建议使用 1. 2. 3. 的有序步骤",
-                    "操作步骤",
+                    "用例步骤建议使用 1. 2. 3. 的有序步骤",
+                    "用例步骤",
                 )
             )
+
+        remark = case["备注"]
+        if requires_source_remark(case) and not has_valid_source_remark(remark):
+            issues.append(
+                case_issue(
+                    case,
+                    "ERROR",
+                    "missing_source_remark",
+                    "生成用例的备注必须写明来源，例如 来源：需求文档、来源：UI设计图、来源：data_analysis_flow.md 或 来源：coverage_dimension_rules.md-合规追溯",
+                    "备注",
+                )
+            )
+
+        if requires_source_remark(case):
+            filled_empty_headers = [
+                header for header in EMPTY_GENERATED_HEADERS if case.get(header, "")
+            ]
+            if filled_empty_headers:
+                issues.append(
+                    case_issue(
+                        case,
+                        "ERROR",
+                        "generated_fields_must_be_empty",
+                        "生成用例的以下字段必须留空："
+                        + "、".join(filled_empty_headers),
+                    )
+                )
 
         expectation = case["预期结果"]
         if expectation and is_vague_expectation(expectation):
@@ -392,51 +408,22 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
 
 
 def validate_id_sequence(cases: list[dict[str, str]]) -> list[Issue]:
-    """同模块同类型下三位序号应自身连续（无跳号），检测到跳号时给出 WARN。
-
-    注意：追加模式下编号不从 001 开始属于正常情况，此处只检查序号是否有
-    跳号（如 001、002、004 缺少 003），不要求必须从 001 起始。
-    """
-    issues: list[Issue] = []
-    grouped: dict[tuple[str, str], list[int]] = {}
-
-    for case in cases:
-        match = CASE_ID_PATTERN.match(case["用例编号"] or "")
-        if not match:
-            continue
-        key = (match.group("module"), match.group("type"))
-        grouped.setdefault(key, []).append(int(match.group("seq")))
-
-    for (module, id_type), sequences in grouped.items():
-        sequences = sorted(sequences)
-        # 期望序列：从实际最小序号连续递增到最小序号 + 数量 - 1
-        expected = list(range(sequences[0], sequences[0] + len(sequences)))
-        if sequences != expected:
-            missing = sorted(set(expected) - set(sequences))
-            missing_text = "、".join(f"{value:03d}" for value in missing)
-            issues.append(
-                text_issue(
-                    "WARN",
-                    "non_continuous_id_sequence",
-                    f"{module}-{id_type} 编号序号存在跳号，缺少：{missing_text}",
-                )
-            )
-
-    return issues
+    """图片版输出表头不包含用例编号，因此不再校验编号连续性。"""
+    return []
 
 
 def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
     """核心交易链路模块应覆盖约定的关键场景关键词，缺失时给出 WARN。"""
     issues: list[Issue] = []
-    modules_present = {case["功能模块"] for case in cases if case["功能模块"]}
+    modules_present = {case_group(case) for case in cases if case_group(case)}
 
     for module, keyword_groups in CORE_FLOW_KEYWORDS.items():
-        if module not in modules_present:
+        if not any(module in present for present in modules_present):
             continue
         module_text = "".join(
-            f"{case['测试场景']}{case['前置条件']}{case['操作步骤']}{case['预期结果']}".lower()
+            f"{case['用例名称']}{case['前置条件']}{case['用例步骤']}{case['预期结果']}".lower()
             for case in cases
-            if case["功能模块"] == module
+            if module in case_group(case)
         )
         missing_groups = [
             groups[0]
@@ -458,48 +445,37 @@ def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
 def validate_duplicates(cases: list[dict[str, str]]) -> list[Issue]:
     issues: list[Issue] = []
 
-    duplicated_ids = duplicate_values(cases, lambda case: (case["用例编号"],))
-    for case_id, duplicated_cases in duplicated_ids.items():
-        locations = "；".join(case_location(case) for case in duplicated_cases)
-        issues.append(
-            text_issue(
-                "ERROR",
-                "duplicate_case_id",
-                f"用例编号重复：{case_id[0]}，位置：{locations}",
-            )
-        )
-
-    duplicated_scenarios = duplicate_values(
-        cases, lambda case: (case["功能模块"], case["测试场景"])
+    duplicated_names = duplicate_values(
+        cases, lambda case: (case_group(case), case["用例名称"])
     )
-    for key, duplicated_cases in duplicated_scenarios.items():
-        module, scenario = key
+    for key, duplicated_cases in duplicated_names.items():
+        group, case_name = key
         locations = "；".join(case_location(case) for case in duplicated_cases)
         issues.append(
             text_issue(
                 "ERROR",
-                "duplicate_scenario",
-                f"测试场景重复：{module} / {scenario}，位置：{locations}",
+                "duplicate_case_name",
+                f"用例名称重复：{group} / {case_name}，位置：{locations}",
             )
         )
 
     duplicated_flows = duplicate_values(
         cases,
         lambda case: (
-            case["功能模块"],
+            case_group(case),
             case["前置条件"],
-            case["操作步骤"],
+            case["用例步骤"],
             case["预期结果"],
         ),
     )
     for key, duplicated_cases in duplicated_flows.items():
-        module = key[0]
+        group = key[0]
         locations = "；".join(case_location(case) for case in duplicated_cases)
         issues.append(
             text_issue(
                 "WARN",
                 "duplicate_flow",
-                f"疑似重复流程：{module}，位置：{locations}",
+                f"疑似重复流程：{group}，位置：{locations}",
             )
         )
 
@@ -512,7 +488,7 @@ def build_summary(
     issues: list[Issue],
     fixes: list[dict[str, object]] | None = None,
 ) -> dict[str, object]:
-    modules = Counter(case["功能模块"] for case in cases if case["功能模块"])
+    modules = Counter(case_group(case) for case in cases if case_group(case))
     errors = [issue for issue in issues if issue.severity == "ERROR"]
     warnings = [issue for issue in issues if issue.severity == "WARN"]
     fixes = fixes or []

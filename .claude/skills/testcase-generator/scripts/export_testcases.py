@@ -9,11 +9,12 @@
     outputs/origin_exports/**/*_testcases.md
 
 默认输出：
-    outputs/excel_exports/测试用例导出_YYYYMMDD_HHMMSS.xlsx
+    outputs/excel_exports/<site_type>/测试用例导出_YYYYMMDD_HHMMSS.xlsx
 
 适用场景：
     - 将 Agent 生成在 outputs/origin_exports/ 的用例导出为 Excel。
     - 使用 --source 导出指定模块或指定目录的 Markdown 用例。
+    - 未指定 --output 时，按 public_site / business_site 分类输出。
     - 导出前自动执行完整校验；存在 ERROR 时停止导出。
     - 使用 --strict 在存在 ERROR 或 WARN 时都停止导出。
 
@@ -22,8 +23,8 @@
 
 示例：
     python scripts/export_testcases.py
-    python scripts/export_testcases.py --source outputs/origin_exports/cart_testcases.md
-    python scripts/export_testcases.py --strict -o cart_testcases.xlsx
+    python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md
+    python scripts/export_testcases.py --strict -o data_analysis_testcases.xlsx
 
 本脚本只使用 Python 标准库，不需要额外安装依赖。
 """
@@ -63,6 +64,7 @@ INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 _STYLE_DEFAULT = 0   # 未使用的默认样式占位
 _STYLE_HEADER = 1    # 表头：加粗、绿色背景、居中
 _STYLE_DATA = 2      # 数据行：带边框、顶部对齐、自动换行
+SITE_TYPES = ("public_site", "business_site")
 
 
 def column_name(index: int) -> str:
@@ -106,7 +108,7 @@ def worksheet_xml(headers: list[str], cases: list[dict[str, str]]) -> str:
         for row_index, case in enumerate(cases, start=2)
     )
 
-    column_widths = [18, 14, 36, 10, 36, 44, 52, 12, 24]
+    column_widths = [16, 16, 16, 36, 10, 12, 16, 36, 48, 52, 24, 18, 14, 24, 18, 18]
     cols = "".join(
         f'<col min="{index}" max="{index}" width="{width}" customWidth="1"/>'
         for index, width in enumerate(column_widths, start=1)
@@ -227,6 +229,27 @@ def default_output_path(output_dir: Path) -> Path:
     return output_dir / f"测试用例导出_{timestamp}.xlsx"
 
 
+def site_type_for_case_file(case_file: Path, origin_dir: Path) -> str | None:
+    try:
+        relative = case_file.resolve().relative_to(origin_dir.resolve())
+    except ValueError:
+        return None
+
+    if relative.parts and relative.parts[0] in SITE_TYPES:
+        return relative.parts[0]
+    return None
+
+
+def group_case_files_by_site(
+    case_files: list[Path], origin_dir: Path
+) -> dict[str | None, list[Path]]:
+    groups: dict[str | None, list[Path]] = {}
+    for case_file in case_files:
+        site_type = site_type_for_case_file(case_file, origin_dir)
+        groups.setdefault(site_type, []).append(case_file)
+    return groups
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     root = project_root()
     parser = argparse.ArgumentParser(
@@ -240,7 +263,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "-o",
         "--output",
-        help="输出文件名或路径。相对路径会保存到 outputs/excel_exports/",
+        help=(
+            "输出文件名或路径。相对路径会保存到 outputs/excel_exports/；"
+            "未指定时按 source 所属站点分类输出"
+        ),
     )
     parser.add_argument(
         "--strict",
@@ -250,7 +276,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--clean",
         action="store_true",
-        help="导出成功后清理 outputs/excel_exports/ 下的历史 xlsx，仅保留本次导出文件",
+        help="导出成功后清理本次输出目录下的历史 xlsx，仅保留本次导出文件",
     )
     return parser.parse_args(argv)
 
@@ -286,13 +312,11 @@ def main(argv: list[str]) -> int:
     configure_output_encoding()
     root = project_root()
     output_dir = root / "outputs" / "excel_exports"
+    origin_dir = root / "outputs" / "origin_exports"
     args = parse_args(argv)
 
     try:
         source = ensure_under(build_source_path(args.source, root), root, "输入路径")
-        output_path = ensure_under(
-            build_output_path(args.output, output_dir), output_dir, "输出路径"
-        )
         case_files = discover_case_files(source)
     except (FileNotFoundError, ValueError) as error:
         print(f"导出失败：{error}", file=sys.stderr)
@@ -302,52 +326,92 @@ def main(argv: list[str]) -> int:
         print("导出失败：未找到任何测试用例 Markdown 文件", file=sys.stderr)
         return 1
 
-    cases: list[dict[str, str]] = []
-    warnings: list[str] = []
-    for case_file in case_files:
-        parsed_cases, parse_warnings = parse_case_file(case_file)
-        cases.extend(parsed_cases)
-        warnings.extend(parse_warnings)
-
-    if not cases:
-        print("导出失败：未解析到测试用例", file=sys.stderr)
-        for warning in warnings:
-            print(f"- {warning}", file=sys.stderr)
-        return 1
-
-    validation_issues = [
-        text_issue("ERROR", "parse_error", warning) for warning in warnings
-    ]
-    validation_issues.extend(validate_case_rows(cases))
-    validation_issues.extend(validate_duplicates(cases))
-    validation_issues.extend(validate_id_sequence(cases))
-    validation_issues.extend(validate_core_flow_coverage(cases))
-
-    if validation_issues:
-        print("导出前校验结果：")
-        for issue in validation_issues:
-            print(f"- {format_issue(issue)}")
-        if has_blocking_issues(validation_issues, strict=args.strict):
-            if args.strict:
-                print("已启用 --strict，存在 ERROR 或 WARN，停止导出。", file=sys.stderr)
-            else:
-                print("存在 ERROR，停止导出。", file=sys.stderr)
+    groups = group_case_files_by_site(case_files, origin_dir)
+    if args.output:
+        try:
+            output_path = ensure_under(
+                build_output_path(args.output, output_dir), output_dir, "输出路径"
+            )
+        except ValueError as error:
+            print(f"导出失败：{error}", file=sys.stderr)
             return 1
-        print()
+        export_groups = [("all", case_files, output_path)]
+    else:
+        export_groups = []
+        for site_type, files in sorted(groups.items(), key=lambda item: item[0] or ""):
+            group_output_dir = output_dir / site_type if site_type else output_dir
+            export_groups.append((site_type or "未分类", files, default_output_path(group_output_dir)))
 
-    write_xlsx(output_path, cases)
+    exported_count = 0
+    for group_name, group_files, output_path in export_groups:
+        cases: list[dict[str, str]] = []
+        warnings: list[str] = []
+        for case_file in group_files:
+            parsed_cases, parse_warnings = parse_case_file(case_file)
+            cases.extend(parsed_cases)
+            warnings.extend(parse_warnings)
 
-    removed_files: list[Path] = []
-    if args.clean:
-        removed_files = clean_old_exports(output_dir, output_path)
+        if not cases:
+            print(f"导出失败：{group_name} 未解析到测试用例", file=sys.stderr)
+            for warning in warnings:
+                print(f"- {warning}", file=sys.stderr)
+            return 1
 
-    modules = sorted({case["功能模块"] for case in cases if case["功能模块"]})
-    print("已导出测试用例 Excel：")
-    print(f"- 文件路径：{output_path}")
-    print(f"- 用例数量：{len(cases)}")
-    print(f"- 覆盖模块：{', '.join(modules)}")
-    if args.clean:
-        print(f"- 已清理历史文件：{len(removed_files)} 个")
+        validation_issues = [
+            text_issue("ERROR", "parse_error", warning) for warning in warnings
+        ]
+        validation_issues.extend(validate_case_rows(cases))
+        validation_issues.extend(validate_duplicates(cases))
+        validation_issues.extend(validate_id_sequence(cases))
+        validation_issues.extend(validate_core_flow_coverage(cases))
+
+        if validation_issues:
+            print(f"导出前校验结果（{group_name}）：")
+            for issue in validation_issues:
+                print(f"- {format_issue(issue)}")
+            if has_blocking_issues(validation_issues, strict=args.strict):
+                if args.strict:
+                    print(
+                        "已启用 --strict，存在 ERROR 或 WARN，停止导出。",
+                        file=sys.stderr,
+                    )
+                else:
+                    print("存在 ERROR，停止导出。", file=sys.stderr)
+                return 1
+            print()
+
+        write_xlsx(output_path, cases)
+
+        removed_files: list[Path] = []
+        if args.clean:
+            removed_files = clean_old_exports(output_path.parent, output_path)
+
+        modules = sorted(
+            {
+                " / ".join(
+                    group
+                    for group in (
+                        case.get("一级分组", ""),
+                        case.get("二级分组", ""),
+                        case.get("三级分组", ""),
+                    )
+                    if group
+                )
+                for case in cases
+                if case.get("一级分组")
+            }
+        )
+        print("已导出测试用例 Excel：")
+        print(f"- 站点分类：{group_name}")
+        print(f"- 文件路径：{output_path}")
+        print(f"- 用例数量：{len(cases)}")
+        print(f"- 覆盖模块：{', '.join(modules)}")
+        if args.clean:
+            print(f"- 已清理历史文件：{len(removed_files)} 个")
+        exported_count += 1
+
+    if exported_count > 1:
+        print(f"共导出 {exported_count} 个 Excel 文件。")
     return 0
 
 

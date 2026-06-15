@@ -7,21 +7,21 @@
 ## 脚本列表
 
 - `case_utils.py`：公共工具模块，提供表头定义、路径安全检查、Markdown 表格解析和文件发现逻辑，不需要直接运行。
-- `validate_cases.py`：检查用例编号、字段完整性、优先级和重复场景，支持 ERROR/WARN 分级、JSON 输出和安全格式修复。
+- `validate_cases.py`：检查标准表头、字段完整性、优先级、重复用例名称和重复流程，支持 ERROR/WARN 分级、JSON 输出和安全格式修复。
 - `export_testcases.py`：将模块 Markdown 用例导出为 Excel 表格文件，导出前会先执行完整校验。
 
 ## 推荐执行闭环
 
 生成测试用例后，建议按以下顺序执行：
 
-1. Agent 生成或修改 `outputs/origin_exports/<module_name>_testcases.md`
+1. Agent 生成或修改 `outputs/origin_exports/<site_type>/<module_name>_testcases.md`
 2. 运行 `validate_cases.py` 校验输出文件
 3. 如果存在 `ERROR`，Agent 根据问题明细修复 Markdown 用例
 4. 如只是表格格式问题，可运行 `validate_cases.py --fix`
 5. 重新运行 `validate_cases.py`
 6. 校验通过后运行 `export_testcases.py` 导出 Excel
 
-脚本只负责机械校验和安全格式修复；前置条件、预期结果、重复场景、优先级和用例类型等业务语义问题应由 Agent 或测试人员根据资料修复。
+脚本只负责机械校验和安全格式修复；前置条件、预期结果、重复用例、优先级和用例描述等业务语义问题应由 Agent 或测试人员根据资料修复。
 
 ## 校验用例脚本
 
@@ -31,12 +31,12 @@
 python scripts/validate_cases.py
 ```
 
-默认校验 `outputs/origin_exports/` 下的生成用例文件。
+默认递归校验 `outputs/origin_exports/` 下的生成用例文件，包括 `public_site/` 和 `business_site/` 分类目录。
 
 ### 校验单个模块
 
 ```bash
-python scripts/validate_cases.py --source outputs/origin_exports/cart_testcases.md
+python scripts/validate_cases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md
 ```
 
 ### 输出 JSON 结果
@@ -51,9 +51,9 @@ python scripts/validate_cases.py --json
 python scripts/validate_cases.py --fix
 ```
 
-`--fix` 只修复 `outputs/origin_exports/` 内的 Markdown 表格格式，例如表头顺序、分隔行、单元格空格、换行 `<br>`、竖线转义、重复空行和文件末尾换行。不会修改 `testcase_templates/`，也不会修改用例编号、优先级、用例类型、测试场景、前置条件或预期结果等业务内容。
+`--fix` 只修复 `outputs/origin_exports/` 内的 Markdown 表格格式，例如表头顺序、分隔行、单元格空格、换行 `<br>`、竖线转义、重复空行和文件末尾换行。不会修改 `testcase_templates/`，也不会修改优先级、用例名称、用例描述、前置条件或预期结果等业务内容。
 
-校验内容包括标准表头、字段完整性、优先级、用例类型、重复编号、重复测试场景、重复流程和空泛预期结果。
+校验内容包括标准表头、字段完整性、优先级、重复用例名称、重复流程和空泛预期结果。
 问题会按 `ERROR` 和 `WARN` 分级；存在 `ERROR` 时脚本退出码为 `1`。
 
 ## 导出表格脚本
@@ -66,19 +66,19 @@ python scripts/validate_cases.py --fix
 python scripts/export_testcases.py
 ```
 
-脚本会默认读取 `outputs/origin_exports/**/*_testcases.md`，导出前先执行完整校验，并将结果导出到 `outputs/excel_exports/`。
+脚本会默认读取 `outputs/origin_exports/**/*_testcases.md`，包括站点分类目录下的用例文件；导出前先执行完整校验，并按站点分类导出到 `outputs/excel_exports/public_site/` 或 `outputs/excel_exports/business_site/`。
 存在 `ERROR` 时会停止导出。
 
 ### 指定单个模块导出
 
 ```bash
-python scripts/export_testcases.py --source outputs/origin_exports/cart_testcases.md
+python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md
 ```
 
 ### 指定导出文件名
 
 ```bash
-python scripts/export_testcases.py -o cart_testcases.xlsx --source outputs/origin_exports/cart_testcases.md
+python scripts/export_testcases.py -o data_analysis_testcases.xlsx --source outputs/origin_exports/business_site/data_analysis_testcases.md
 ```
 
 ### 启用严格校验
@@ -93,5 +93,5 @@ python scripts/export_testcases.py --strict
 
 - 脚本只能处理本项目内的用例文件。
 - 执行前必须确认目标模块。
-- 导出结果应保存到 `outputs/excel_exports/`。
+- 导出结果应保存到 `outputs/excel_exports/<site_type>/`。
 - 校验失败时应先修复用例，再进行导出。
