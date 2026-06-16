@@ -41,6 +41,7 @@ from xml.sax.saxutils import escape
 
 from case_utils import (
     EXPECTED_HEADERS,
+    apply_difficulty_tags,
     build_source_path,
     configure_output_encoding,
     discover_case_files,
@@ -202,8 +203,8 @@ def write_xlsx(output_path: Path, cases: list[dict[str, str]]) -> None:
     xmlns:dcterms="http://purl.org/dc/terms/"
     xmlns:dcmitype="http://purl.org/dc/dcmitype/"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:creator>淘宝功能测试用例生成器</dc:creator>
-  <cp:lastModifiedBy>淘宝功能测试用例生成器</cp:lastModifiedBy>
+  <dc:creator>CPV 功能测试用例生成器</dc:creator>
+  <cp:lastModifiedBy>CPV 功能测试用例生成器</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">{now}</dcterms:created>
   <dcterms:modified xsi:type="dcterms:W3CDTF">{now}</dcterms:modified>
 </cp:coreProperties>''',
@@ -380,6 +381,7 @@ def main(argv: list[str]) -> int:
                 return 1
             print()
 
+        cases = apply_difficulty_tags(cases)
         write_xlsx(output_path, cases)
 
         removed_files: list[Path] = []

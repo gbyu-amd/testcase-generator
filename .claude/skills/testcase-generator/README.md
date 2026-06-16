@@ -1,8 +1,8 @@
-# 淘宝测试用例生成器
+# CPV 测试用例生成器
 
 ## 项目是什么
 
-这是一个**基于 Claude Code 的 AI 测试用例生成工具**，以 Skill（技能插件）形式封装，专门服务于淘宝类电商前端项目的功能测试工作。
+这是一个**基于 Claude Code 的 AI 测试用例生成工具**，以 Skill（技能插件）形式封装，专门服务于 CPV 系统的功能测试工作。
 
 核心价值：把需求文档、界面设计图等输入，自动转化为结构化、可执行、可导出的测试用例，代替测试人员手工编写用例的重复劳动，并通过规则和脚本保证用例质量。
 
@@ -21,7 +21,8 @@ testcase-generator/
 ├── inputs/               # 输入层：本次生成的素材
 │   ├── requirements/     # 需求文档 PRD
 │   └── ui_design/        # 界面设计图
-├── scripts/              # 脚本层：机器校验和导出
+├── scripts/              # 脚本层：需求拆分、机器校验和导出
+│   ├── split_requirements.py # 拆分整份 PRD 并创建 UI 目录
 │   ├── validate_cases.py # 校验格式、质量、编号
 │   └── export_testcases.py # 导出 Excel
 └── outputs/              # 输出层
@@ -103,8 +104,8 @@ testcase-generator/
 
 在对话中提出需求，例如：
 
-- `根据 inputs/requirements/taobao_login_prd.md 生成测试用例`
-- `根据界面设计图补充购物车模块用例`
+- `根据 inputs/requirements/business_site/annual_plan/REQ-CPV-002.md 生成年度计划测试用例`
+- `根据 inputs/ui_design/REQ-CPV-039/ 补充权限管理界面交互用例`
 
 ### 3. 获取输出
 
@@ -183,14 +184,14 @@ python scripts/validate_cases.py --source testcase_templates/modules
 
 | 一级菜单 | 二级菜单 | 文件路径示例 |
 |---|---|---|
-| 公共管理站点 | 站点管理 | `testcase_templates/modules/public_site/site_management/` |
-| 公共管理站点 | 用户管理 | `testcase_templates/modules/public_site/user_management/` |
-| 公共管理站点 | 权限管理 | `testcase_templates/modules/public_site/permission_management/` |
-| 业务站点 | 年度计划设置 | `testcase_templates/modules/business_site/plan_management/annual_plan_settings/` |
-| 业务站点 | 任务管理 | `testcase_templates/modules/business_site/plan_management/task_management/` |
-| 业务站点 | 方案模板 | `testcase_templates/modules/business_site/scheme_management/scheme_templates/` |
-| 业务站点 | 方案编制 | `testcase_templates/modules/business_site/scheme_management/scheme_formulation/` |
-| 业务站点 | 数据管理与洞察 | `testcase_templates/modules/business_site/data_management_insights/` |
-| 业务站点 | 报告生成 | `testcase_templates/modules/business_site/report_management/report_generation/` |
+| 公共管理站点 | 站点管理 | `testcase_templates/modules/public_site/site_manage/` |
+| 公共管理站点 | 用户管理 | `testcase_templates/modules/public_site/user_manage/` |
+| 公共管理站点 | 权限管理 | `testcase_templates/modules/public_site/permission_manage/` |
+| 业务站点 | 年度计划设置 | `testcase_templates/modules/business_site/plan_manage/annual_plan_settings/` |
+| 业务站点 | 任务管理 | `testcase_templates/modules/business_site/plan_manage/task_manage/` |
+| 业务站点 | 方案模板 | `testcase_templates/modules/business_site/scheme_manage/scheme_templates/` |
+| 业务站点 | 方案编制 | `testcase_templates/modules/business_site/scheme_manage/scheme_formulation/` |
+| 业务站点 | 数据管理与洞察 | `testcase_templates/modules/business_site/data_manage_insights/` |
+| 业务站点 | 报告生成 | `testcase_templates/modules/business_site/report_manage/report_generation/` |
 
 每个菜单目录下优先放置 `module_overview.md` 和 `testcases.md`。目录名必须全部小写，不带空格，以 `_` 分隔单词。如果某个一级菜单下暂时没有二级菜单拆分，也可以直接在 `testcase_templates/modules/<level1_menu>/` 下放置兜底参考文件。

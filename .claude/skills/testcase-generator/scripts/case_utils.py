@@ -44,9 +44,12 @@ REQUIRED_HEADERS = [
     "前置条件",
     "用例步骤",
     "预期结果",
+    "备注",
+    "用例标签",
 ]
 
 VALID_PRIORITIES = {"P0", "P1", "P2"}
+DIFFICULTY_LEVELS = ("简单", "一般", "困难")
 
 # 编号中使用的类型，对应规则文件 testcase_id_rules.md
 VALID_ID_TYPES = ["功能", "异常", "边界", "权限", "回归", "兼容", "联动"]
@@ -135,6 +138,197 @@ def normalize_cell(value: str) -> str:
     # <br\s*/?> 的正则已能匹配所有变体（<br>、<br/>、<br />），无需额外 replace
     value = re.sub(r"<br\s*/?>", "\n", value, flags=re.IGNORECASE)
     return value.strip()
+
+
+def split_case_tags(value: str) -> list[str]:
+    """按项目约定拆分用例标签，兼容中文和英文分号。"""
+    return [
+        tag.strip()
+        for tag in re.split(r"[;；]", value or "")
+        if tag and tag.strip()
+    ]
+
+
+def count_effective_steps(value: str) -> int:
+    """统计有效执行步骤，登录动作不计入。"""
+    normalized = normalize_cell(value)
+    lines = [line.strip() for line in normalized.splitlines() if line.strip()]
+    numbered_lines = [
+        line for line in lines if re.match(r"^\d+[.、]\s*", line)
+    ]
+    candidates = numbered_lines or lines
+    return sum(1 for line in candidates if "登录" not in line)
+
+
+def count_non_empty_lines(value: str) -> int:
+    normalized = normalize_cell(value)
+    return len([line for line in normalized.splitlines() if line.strip()])
+
+
+def _contains_any(text: str, keywords: Iterable[str]) -> bool:
+    return any(keyword in text for keyword in keywords)
+
+
+def _contains_all(text: str, keywords: Iterable[str]) -> bool:
+    return all(keyword in text for keyword in keywords)
+
+
+def _normalize_keyword_text(*values: str) -> str:
+    return "".join("\n".join(values).split()).lower()
+
+
+def infer_case_difficulty(case: dict[str, str]) -> str:
+    """根据 difficulty_level_rules.md 的关键字规则推断用例难度。"""
+    title_text = case.get("用例名称", "")
+    step_text = case.get("用例步骤", "")
+    expectation_text = case.get("预期结果", "")
+
+    normalized_title_text = _normalize_keyword_text(title_text)
+    normalized_step_expectation_text = _normalize_keyword_text(step_text, expectation_text)
+    normalized_combination_text = _normalize_keyword_text(title_text, step_text)
+    normalized_simple_text = _normalize_keyword_text(title_text, step_text, expectation_text)
+
+    difficult_high_confidence_keywords = [
+        "一键分析",
+        "一键更新",
+        "数据迁移",
+        "跨环境",
+        "第三方",
+        "minitab",
+        "多角色",
+        "多人",
+        "会签",
+        "电子签名",
+        "审批",
+        "审核",
+        "转审",
+        "加签",
+        "批准",
+        "工作流",
+        "数据完整性",
+        "一致性验证",
+        "分析结果数据正确性校验",
+        "报告审批",
+        "报告批准",
+        "报告生效",
+        "报告回推",
+        "报告链路",
+    ]
+
+    general_high_confidence_keywords = [
+        "导入",
+        "批量导出",
+        "跨页面",
+        "跨模块",
+        "审计追踪详情",
+        "批量删除",
+        "组合搜索",
+        "组合查询",
+    ]
+
+    if _contains_any(normalized_title_text, difficult_high_confidence_keywords):
+        return "困难"
+    if _contains_any(normalized_title_text, general_high_confidence_keywords):
+        return "一般"
+
+    if _contains_any(normalized_step_expectation_text, difficult_high_confidence_keywords):
+        return "困难"
+
+    general_step_expectation_keywords = [
+        "导入",
+        "跨页面",
+        "跨模块",
+    ]
+    if _contains_any(normalized_step_expectation_text, general_step_expectation_keywords):
+        return "一般"
+
+    difficult_keyword_combinations = [
+        ("报告", "审批"),
+        ("报告", "审核"),
+        ("报告", "批准"),
+        ("报告", "生效"),
+        ("报告", "回推"),
+        ("跨模块", "校验"),
+    ]
+    if any(
+        _contains_all(normalized_combination_text, combination)
+        for combination in difficult_keyword_combinations
+    ):
+        return "困难"
+
+    general_keyword_combinations = [
+        ("批量", "删除"),
+        ("批量", "导出"),
+        ("组合", "搜索"),
+        ("组合", "查询"),
+        ("审计追踪", "详情"),
+        ("查看", "详情"),
+        ("报告", "生成"),
+        ("报告", "导出"),
+    ]
+    if any(
+        _contains_all(normalized_combination_text, combination)
+        for combination in general_keyword_combinations
+    ):
+        return "一般"
+
+    simple_keywords = [
+        "列表页",
+        "翻页",
+        "排序",
+        "筛选重置",
+        "刷新",
+        "启用/停用",
+        "启用",
+        "停用",
+        "重置",
+        "单项操作",
+        "单页面提交",
+        "新增",
+        "增加",
+        "添加",
+        "编辑",
+        "删除",
+        "搜索",
+        "查询",
+        "单字段校验",
+        "必填",
+        "长度",
+        "格式提示",
+        "下拉多选",
+        "下拉选项",
+        "提示语校验",
+        "导出",
+        "单文件导出",
+    ]
+    if _contains_any(normalized_simple_text, simple_keywords):
+        return "简单"
+
+    precondition_count = count_non_empty_lines(case.get("前置条件", ""))
+    step_count = count_effective_steps(case.get("用例步骤", ""))
+    expectation_count = count_non_empty_lines(case.get("预期结果", ""))
+
+    if precondition_count > 3 or step_count > 5 or expectation_count >= 3:
+        return "困难"
+    if precondition_count <= 1 and step_count <= 2 and expectation_count <= 1:
+        return "简单"
+    return "一般"
+
+
+def merge_difficulty_tag(existing_tags: str, difficulty: str) -> str:
+    """用例标签只保留难度等级。"""
+    return difficulty
+
+
+def apply_difficulty_tag(case: dict[str, str]) -> dict[str, str]:
+    updated = dict(case)
+    difficulty = infer_case_difficulty(updated)
+    updated["用例标签"] = merge_difficulty_tag(updated.get("用例标签", ""), difficulty)
+    return updated
+
+
+def apply_difficulty_tags(cases: Iterable[dict[str, str]]) -> list[dict[str, str]]:
+    return [apply_difficulty_tag(case) for case in cases]
 
 
 def parse_case_file(path: Path) -> tuple[list[dict[str, str]], list[str]]:

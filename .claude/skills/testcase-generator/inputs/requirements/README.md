@@ -6,13 +6,35 @@
 
 ## 建议命名
 
-- `登录与站点选择需求.md`
-- `年度计划生效生成任务需求.md`
-- `方案审批与监控项目生成需求.md`
-- `数据分析文件校验需求.md`
-- `一键分析替换数据源需求.md`
-- `报告编制与任务回推需求.md`
-- `审计追踪与电子签名需求.md`
+- 整份原始 PRD：`CPV产品规格说明书 (0615).md`
+- 自动拆分索引：`requirements_index.md`
+- 拆分后单需求：`<site_type>/<module_slug>/REQ-CPV-001.md`
+
+推荐结构：
+
+```text
+requirements/
+  CPV产品规格说明书 (0615).md
+  requirements_index.md
+  public_site/
+    audit_trail/
+      REQ-CPV-001.md
+  business_site/
+    data_analysis/
+      REQ-CPV-002.md
+```
+
+整份 PRD 保留原文不改；按小章节拆出的 `REQ-*` 文件作为后续生成测试用例的主要输入。
+
+## 自动拆分
+
+在技能根目录执行：
+
+```bash
+python scripts/split_requirements.py --prd "inputs/requirements/CPV产品规格说明书 (0615).md"
+```
+
+脚本默认按 3/4 级标题拆分需求，并为每个需求创建对应 UI 目录 README。拆分后必须先检查 `requirements_index.md`，确认章节边界、站点分类、模块目录和 UI 归属。
 
 ## 阅读重点
 

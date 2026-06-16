@@ -4,6 +4,37 @@
 
 本目录用于存放 CPV 系统的界面设计图、截图说明、交互说明、流程图、弹窗说明和视觉标注文档。设计资料可覆盖公共管理站点、自定义业务站点、年度计划、任务、方案、监控项目、数据分析、一键分析、报告编制、审计追踪、电子签名和异步任务等页面。
 
+## 推荐目录结构
+
+UI 目录应按拆分后的需求编号组织，便于和 `inputs/requirements/**/REQ-*.md` 一一对应：
+
+```text
+ui_design/
+  _incoming/
+    README.md
+    待归类图片.png
+  REQ-CPV-001/
+    README.md
+    01_list.png
+    02_detail.png
+  REQ-CPV-002/
+    README.md
+  _unassigned/
+    README.md
+```
+
+- UI 原图必须放在 `inputs/ui_design/` 下，`docx/` 仅作为临时杂文件目录，不作为 UI 来源。
+- 新收到但未确认归属的图片先放入 `_incoming/`。
+- `REQ-*` 目录由 `scripts/split_requirements.py` 自动创建。
+- 每个 `README.md` 记录关联需求、图片清单、页面说明和交互说明。
+- 文件名无法匹配需求编号的图片先记录到 `_unassigned/README.md`，人工确认后再移动到对应需求目录。
+
+生成方式：
+
+```bash
+python scripts/split_requirements.py --prd "inputs/requirements/CPV产品规格说明书 (0615).md" --ui-source "inputs/ui_design/_incoming"
+```
+
 ## 阅读重点
 
 读取界面设计图时，应重点提取：

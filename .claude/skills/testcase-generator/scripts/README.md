@@ -7,6 +7,7 @@
 ## 脚本列表
 
 - `case_utils.py`：公共工具模块，提供表头定义、路径安全检查、Markdown 表格解析和文件发现逻辑，不需要直接运行。
+- `split_requirements.py`：将整份 Markdown PRD 按章节拆成独立需求文件，生成需求索引，并为每个需求创建对应 UI 目录 README。
 - `validate_cases.py`：检查标准表头、字段完整性、优先级、重复用例名称和重复流程，支持 ERROR/WARN 分级、JSON 输出和安全格式修复。
 - `export_testcases.py`：将模块 Markdown 用例导出为 Excel 表格文件，导出前会先执行完整校验。
 
@@ -22,6 +23,38 @@
 6. 校验通过后运行 `export_testcases.py` 导出 Excel
 
 脚本只负责机械校验和安全格式修复；前置条件、预期结果、重复用例、优先级和用例描述等业务语义问题应由 Agent 或测试人员根据资料修复。
+
+## 需求拆分脚本
+
+### 按整份 PRD 拆分需求
+
+```bash
+python scripts/split_requirements.py --prd "inputs/requirements/CPV产品规格说明书 (0615).md"
+```
+
+默认按 3/4 级标题拆分小章节，生成：
+
+- `inputs/requirements/requirements_index.md`
+- `inputs/requirements/<site_type>/<module_slug>/REQ-CPV-xxx.md`
+- `inputs/ui_design/REQ-CPV-xxx/README.md`
+
+### 生成未归类 UI 图片清单
+
+```bash
+python scripts/split_requirements.py --prd "inputs/requirements/CPV产品规格说明书 (0615).md" --ui-source "inputs/ui_design/_incoming"
+```
+
+UI 图片必须放在 `inputs/ui_design/` 下。若图片文件名无法自动匹配需求编号，脚本会写入 `inputs/ui_design/_unassigned/README.md`，供人工确认后再移动到对应需求目录。
+
+默认使用短编号文件名，避免 Windows 长路径问题。若确实需要在文件名中追加标题，可增加 `--include-title-in-name`。
+
+### 重建拆分文件
+
+```bash
+python scripts/split_requirements.py --prd "inputs/requirements/CPV产品规格说明书 (0615).md" --overwrite
+```
+
+首次拆分后建议先检查 `requirements_index.md`，确认章节边界、站点分类、模块目录和 UI 归属，再基于单个 `REQ-*` 文件生成测试用例。
 
 ## 校验用例脚本
 

@@ -47,6 +47,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from case_utils import (
+    DIFFICULTY_LEVELS,
     EXPECTED_HEADERS,
     REQUIRED_HEADERS,
     VALID_PRIORITIES,
@@ -54,10 +55,12 @@ from case_utils import (
     configure_output_encoding,
     discover_case_files,
     ensure_under,
+    infer_case_difficulty,
     is_separator_row,
     normalize_cell,
     parse_case_file,
     project_root,
+    split_case_tags,
     split_markdown_row,
 )
 
@@ -86,23 +89,56 @@ MIN_EXPECTATION_LENGTH = 10
 INVALID_SOURCE_REMARKS = {"", "无", "待填", "来源：待填"}
 EMPTY_GENERATED_HEADERS = ["是否自动化", "关联接口", "用例测试类", "关联项目"]
 
-# 核心交易链路模块需要覆盖的关键场景关键词（任一同义词命中即算覆盖）
+# CPV 核心业务模块需要覆盖的关键场景关键词（任一同义词命中即算覆盖）
 CORE_FLOW_KEYWORDS = {
-    "登录": [
-        ["登录态", "登录失效", "登录过期", "token过期", "token 过期"],
-        ["未登录"],
-        ["多页签", "多tab", "多 tab", "页签"],
+    "年度计划": [
+        ["生效"],
+        ["生成任务", "周期性任务"],
+        ["状态", "流转"],
     ],
-    "购物车": [
-        ["库存"],
-        ["失效商品", "商品失效", "下架"],
-        ["金额", "合计", "优惠"],
+    "任务管理": [
+        ["执行", "提交"],
+        ["状态", "流转"],
+        ["关联方案", "方案"],
     ],
-    "结算下单": [
-        ["重复提交", "重复点击", "重复下单", "重复订单"],
-        ["库存"],
-        ["价格变化", "价格变动", "价格"],
-        ["地址"],
+    "方案编制": [
+        ["审批", "审核", "批准"],
+        ["生效"],
+        ["监控项目", "报告"],
+    ],
+    "监控项目": [
+        ["分析", "数据分析"],
+        ["确认"],
+        ["报告", "结论"],
+    ],
+    "数据分析": [
+        ["导入", "数据源"],
+        ["字段", "配置"],
+        ["结果", "图表"],
+    ],
+    "一键分析": [
+        ["全部成功", "成功"],
+        ["部分失败", "失败"],
+        ["未分析原因", "未分析"],
+    ],
+    "报告编制": [
+        ["审批", "审核", "批准"],
+        ["生效"],
+        ["导出", "回推"],
+    ],
+    "权限管理": [
+        ["新增"],
+        ["编辑"],
+        ["删除", "批量删除"],
+        ["配置", "菜单权限", "按钮权限"],
+        ["停用", "启用"],
+    ],
+    "审计追踪": [
+        ["操作人"],
+        ["操作时间"],
+        ["操作类型"],
+        ["受影响对象"],
+        ["详情", "导出"],
     ],
 }
 
@@ -382,6 +418,40 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     )
                 )
 
+        tags = split_case_tags(case.get("用例标签", ""))
+        difficulty_tags = [tag for tag in tags if tag in DIFFICULTY_LEVELS]
+        expected_difficulty = infer_case_difficulty(case)
+        if not difficulty_tags:
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "missing_difficulty_tag",
+                    f"用例标签缺少难度等级，按 difficulty_level_rules.md 推断应为：{expected_difficulty}",
+                    "用例标签",
+                )
+            )
+        elif expected_difficulty not in difficulty_tags:
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "mismatched_difficulty_tag",
+                    f"用例标签中的难度为 {'、'.join(difficulty_tags)}，按 difficulty_level_rules.md 推断应为：{expected_difficulty}",
+                    "用例标签",
+                )
+            )
+        elif len(difficulty_tags) > 1:
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "multiple_difficulty_tags",
+                    f"用例标签中存在多个难度等级：{'、'.join(difficulty_tags)}，仅应保留 {expected_difficulty}",
+                    "用例标签",
+                )
+            )
+
         expectation = case["预期结果"]
         if expectation and is_vague_expectation(expectation):
             issues.append(
@@ -413,7 +483,7 @@ def validate_id_sequence(cases: list[dict[str, str]]) -> list[Issue]:
 
 
 def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
-    """核心交易链路模块应覆盖约定的关键场景关键词，缺失时给出 WARN。"""
+    """CPV 核心业务模块应覆盖约定的关键场景关键词，缺失时给出 WARN。"""
     issues: list[Issue] = []
     modules_present = {case_group(case) for case in cases if case_group(case)}
 
