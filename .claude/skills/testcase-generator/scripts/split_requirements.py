@@ -11,100 +11,22 @@ from __future__ import annotations
 
 import argparse
 import re
-import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
 from case_utils import build_source_path, configure_output_encoding, ensure_under, project_root
+from context_config import MODULE_SLUGS, SITE_PUBLIC_KEYWORDS, output_file_for
 
 
 HEADING_PATTERN = re.compile(r"^(?P<marks>#{1,6})\s+(?P<title>.+?)\s*$")
 CPV_CODE_PATTERN = re.compile(r"CPV[\s-]*[A-Z]+[\s-]*\d+", re.IGNORECASE)
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".gif"}
-
-MODULE_SLUGS = {
-    "首页工作台": "home_workspace",
-    "年度计划设置": "annual_plan",
-    "任务管理": "task_manage",
-    "方案模版": "plan_template",
-    "方案模板": "plan_template",
-    "方案编制": "plan_compile",
-    "项目监控": "project_monitor",
-    "监控项目": "project_monitor",
-    "工艺能力汇总": "process_capability_summary",
-    "相关性分析": "correlation_analysis",
-    "报告模版": "report_template",
-    "报告模板": "report_template",
-    "报告编制": "report_compile",
-    "产品管理": "product_manage",
-    "异步任务处理": "async_task",
-    "用户管理": "user_manage",
-    "部门管理": "department_manage",
-    "岗位管理": "position_manage",
-    "角色管理": "role_manage",
-    "工作流配置": "workflow_config",
-    "日志管理": "log_manage",
-    "系统服务配置": "system_service",
-    "个人中心": "personal_center",
-    "审计追踪": "audit_trail",
-    "多租户配置": "tenant_config",
-    "统一门户管理": "portal_manage",
-    "站点管理": "site_manage",
-    "权限管理": "permission_manage",
-    "数据分析工作台": "data_analysis",
-    "产品工艺管理": "product_process_manage",
-    "工序": "process_step",
-    "操作": "operation",
-    "关键设备": "critical_equipment",
-    "参数与属性维护": "parameter_attribute",
-    "工艺矩阵": "process_matrix",
-    "质量规则配置": "quality_rule_config",
-    "参考限配置": "reference_limit",
-    "能力分析等级配置": "capability_level",
-}
-
-SITE_PUBLIC_KEYWORDS = (
-    "公共管理",
-    "统一门户",
-    "站点管理",
-    "系统服务",
-    "用户登录日志",
-    "日志管理",
-    "用户管理",
-    "部门管理",
-    "岗位管理",
-    "角色管理",
-    "权限管理",
-    "工作流配置",
-    "个人中心",
-    "多租户",
-    "审计追踪",
-    "登录页",
-)
-
-
-def workspace_root() -> Path:
-    return project_root().parent.parent.parent
-
-
-def build_input_path(source_arg: str, skill_root: Path, workspace: Path) -> Path:
-    source_path = Path(source_arg)
-    if source_path.is_absolute():
-        return source_path
-    skill_candidate = skill_root / source_path
-    if skill_candidate.exists():
-        return skill_candidate
-    return workspace / source_path
 
 
 def display_path(path: Path) -> str:
-    resolved = path.resolve()
-    for root in (project_root(), workspace_root()):
-        try:
-            return resolved.relative_to(root.resolve()).as_posix()
-        except ValueError:
-            continue
-    return str(path)
+    try:
+        return path.resolve().relative_to(project_root().resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 @dataclass(frozen=True)
@@ -314,8 +236,8 @@ def index_text(sections: list[RequirementSection], requirements_root: Path, ui_r
         "",
         "本文件由 `scripts/split_requirements.py` 生成，用于记录整份 PRD 拆分后的需求文件和 UI 目录映射。首次生成后请人工确认章节边界、模块归属和 UI 归属。",
         "",
-        "| 需求编号 | 原始编号 | 需求标题 | 站点 | 模块 | 需求文件 | UI 目录 | 原始章节 |",
-        "|---|---|---|---|---|---|---|---|",
+        "| 需求编号 | 原始编号 | 需求标题 | 站点 | 模块 | 输出文件 | 需求文件 | UI 目录 | 原始章节 |",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     for section in sections:
         req_file = (
@@ -325,6 +247,7 @@ def index_text(sections: list[RequirementSection], requirements_root: Path, ui_r
             / f"{section.file_stem}.md"
         )
         ui_dir = ui_root / section.file_stem
+        output_file = output_file_for(section.site_type, section.module_slug)
         lines.append(
             "| "
             + " | ".join(
@@ -334,6 +257,7 @@ def index_text(sections: list[RequirementSection], requirements_root: Path, ui_r
                     section.title.replace("|", "\\|"),
                     section.site_type,
                     section.module_slug,
+                    f"`{display_path(output_file)}`",
                     f"`{display_path(req_file)}`",
                     f"`{display_path(ui_dir)}`",
                     section.source_heading.replace("|", "\\|"),
@@ -345,68 +269,12 @@ def index_text(sections: list[RequirementSection], requirements_root: Path, ui_r
     return "\n".join(lines)
 
 
-def unassigned_ui_text(image_paths: list[Path]) -> str:
-    lines = [
-        "# 未归类 UI 图片清单",
-        "",
-        "以下图片来自 `inputs/ui_design/_incoming/` 或指定的 `inputs/ui_design` 子目录，且未能根据文件名自动匹配到具体需求。请人工确认后移动到对应 `REQ-*` UI 目录，并更新该目录下的 `README.md`。",
-        "",
-        "| 图片 | 说明 |",
-        "|---|---|",
-    ]
-    if image_paths:
-        for image_path in image_paths:
-            lines.append(f"| `{display_path(image_path)}` | 待确认 |")
-    else:
-        lines.append("| 无 | - |")
-    lines.append("")
-    return "\n".join(lines)
-
-
 def write_text_file(path: Path, content: str, overwrite: bool) -> bool:
     if path.exists() and not overwrite:
         return False
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
     return True
-
-
-def collect_ui_images(ui_source: Path | None) -> list[Path]:
-    if ui_source is None or not ui_source.exists():
-        return []
-    if ui_source.is_file():
-        return [ui_source] if ui_source.suffix.lower() in IMAGE_EXTENSIONS else []
-    return sorted(
-        path
-        for path in ui_source.rglob("*")
-        if path.is_file() and path.suffix.lower() in IMAGE_EXTENSIONS
-    )
-
-
-def copy_matching_ui_images(
-    sections: list[RequirementSection],
-    ui_images: list[Path],
-    ui_root: Path,
-    overwrite: bool,
-) -> set[Path]:
-    copied: set[Path] = set()
-    for section in sections:
-        tokens = {section.req_id.lower(), section.file_stem.lower()}
-        if section.original_code:
-            tokens.add(section.original_code.lower())
-        target_dir = ui_root / section.file_stem
-        for image_path in ui_images:
-            image_name = image_path.name.lower()
-            if not any(token and token in image_name for token in tokens):
-                continue
-            target_dir.mkdir(parents=True, exist_ok=True)
-            target_path = target_dir / image_path.name
-            if target_path.exists() and not overwrite:
-                copied.add(image_path)
-                continue
-            shutil.copy2(image_path, target_path)
-            copied.add(image_path)
-    return copied
 
 
 def parse_args() -> argparse.Namespace:
@@ -425,11 +293,6 @@ def parse_args() -> argparse.Namespace:
         default=str(root / "inputs" / "ui_design"),
         help="UI 目录输出位置，默认 inputs/ui_design",
     )
-    parser.add_argument(
-        "--ui-source",
-        default=str(root / "inputs" / "ui_design" / "_incoming"),
-        help="待归类 UI 图片来源目录或单个图片，必须位于 inputs/ui_design 下，默认 inputs/ui_design/_incoming",
-    )
     parser.add_argument("--id-prefix", default="REQ-CPV", help="生成需求编号前缀")
     parser.add_argument("--min-level", type=int, default=3, help="参与拆分的最小标题级别")
     parser.add_argument("--max-level", type=int, default=4, help="参与拆分的最大标题级别")
@@ -444,11 +307,6 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="文件名中追加标题 slug；长路径 Windows 环境不建议开启",
     )
-    parser.add_argument(
-        "--copy-ui",
-        action="store_true",
-        help="根据文件名自动复制可匹配的 UI 图片到需求 UI 目录",
-    )
     return parser.parse_args()
 
 
@@ -462,7 +320,6 @@ def main() -> int:
         build_source_path(args.requirements_root, root), root, "需求输出目录"
     )
     ui_root = ensure_under(build_source_path(args.ui_root, root), root, "UI 输出目录")
-    ui_source = ensure_under(build_source_path(args.ui_source, root), ui_root, "UI 来源")
 
     lines = prd_path.read_text(encoding="utf-8-sig").splitlines()
     sections = build_sections(
@@ -503,27 +360,12 @@ def main() -> int:
         overwrite=True,
     )
 
-    ui_images = collect_ui_images(ui_source)
-    copied_images = copy_matching_ui_images(sections, ui_images, ui_root, args.overwrite) if args.copy_ui else set()
-    unassigned_images = [path for path in ui_images if path not in copied_images]
-    if ui_source:
-        write_text_file(
-            ui_root / "_unassigned" / "README.md",
-            unassigned_ui_text(unassigned_images),
-            overwrite=True,
-        )
-
     print("需求拆分完成：")
     print(f"- PRD：{prd_path.relative_to(root)}")
     print(f"- 识别需求章节：{len(sections)}")
     print(f"- 新写入需求文件：{written_requirements}")
     print(f"- 新写入 UI README：{written_ui_readmes}")
     print(f"- 需求索引：{index_path.relative_to(root)}")
-    if ui_source:
-        print(f"- UI 来源图片：{len(ui_images)}")
-        print(f"- 自动匹配图片：{len(copied_images)}")
-        print(f"- 未归类图片：{len(unassigned_images)}")
-        print(f"- 未归类清单：{(ui_root / '_unassigned' / 'README.md').relative_to(root)}")
     if written_requirements < len(sections) or written_ui_readmes < len(sections):
         print("- 提示：部分文件已存在，未覆盖；如需重建请增加 --overwrite。")
     return 0

@@ -6,24 +6,23 @@
 
 ## 模块目录结构
 
-`modules/` 按 CPV 系统一级菜单 / 二级菜单组织，目录名必须全部小写，不带空格，以 `_` 分隔单词：
+`modules/` 按站点分类和 CPV 一级菜单组织，二级菜单维护为一级菜单目录下的同名 `.md` 文件。目录名和文件名必须全部小写，不带空格，以 `_` 分隔单词：
 
 ```text
 modules/
-├── <level1_menu>/
-│   ├── module_overview.md          # 一级菜单兜底说明，可选
-│   ├── testcases.md                # 一级菜单兜底参考用例，可选
-│   └── <level2_menu>/
-│       ├── module_overview.md      # 二级菜单说明
-│       └── testcases.md            # 二级菜单参考用例
+├── menu_index.md                   # 菜单路径到参考文件的索引
+└── <site_type>/
+    └── <level1_menu>/
+        └── <level2_menu>.md        # 二级菜单参考用例
 ```
 
-读取参考用例时，优先匹配最具体的二级菜单目录；需求跨多个二级菜单时，应读取所有相关目录。
+读取参考用例时，先读取 `modules/menu_index.md`，再按菜单路径命中具体 `.md` 文件；需求跨多个二级菜单时，应读取所有相关文件。
 
 ## 维护原则
 
 - 通用模板只描述字段结构和编写方法。
-- `modules/` 下的一级菜单和二级菜单目录保存只读参考用例。
+- `modules/` 下的参考用例只读维护，`public_site/` 和 `business_site/` 下只保留一级菜单目录。
+- 新增、移动或重命名参考用例文件时，必须同步更新 `modules/menu_index.md`。
 - 新生成或补充的用例必须保存到 `outputs/origin_exports/<site_type>/<module_name>_testcases.md`，其中 `site_type` 为 `public_site` 或 `business_site`。
 - 不允许把多个模块的新用例混写到一个输出文件中。
 - 生成前必须检查参考用例，避免重复场景。

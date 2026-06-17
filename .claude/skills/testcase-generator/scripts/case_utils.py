@@ -394,10 +394,16 @@ def discover_case_files(source: Path) -> list[Path]:
     if source.is_file():
         return [source]
     if source.is_dir():
+        if "testcase_templates" in source.parts and "modules" in source.parts:
+            skipped_names = {"menu_index.md", "module_overview.md", "README.md"}
+            return sorted(
+                path
+                for path in source.rglob("*.md")
+                if path.name not in skipped_names
+            )
+
         # 仅匹配以 _testcases.md 结尾的文件，带时间戳的"另存"文件
         # （如 login_testcases_20260613.md）不在默认扫描范围内，需要
         # 通过 --source 显式指定才能被处理。
-        case_files = set(source.rglob("*_testcases.md"))
-        case_files.update(source.rglob("testcases.md"))
-        return sorted(case_files)
+        return sorted(source.rglob("*_testcases.md"))
     raise FileNotFoundError(f"输入路径不存在：{source}")

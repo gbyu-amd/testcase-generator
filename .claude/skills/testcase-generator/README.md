@@ -14,10 +14,9 @@ testcase-generator/
 ├── generation_rules/     # 规则层：编写规范、编号规则、优先级、覆盖维度、补充规则
 ├── testcase_templates/   # 参考层：各模块高质量参考用例（只读）
 │   ├── common_templates/ # 通用格式模板
-│   └── modules/          # CPV 一级菜单/二级菜单参考用例
-│       └── <level1_menu>/<level2_menu>/
-│           ├── module_overview.md
-│           └── testcases.md
+│   └── modules/          # CPV 菜单参考用例
+│       ├── menu_index.md # 菜单路径到参考文件的索引
+│       └── <site_type>/<level1_menu>/<level2_menu>.md
 ├── inputs/               # 输入层：本次生成的素材
 │   ├── requirements/     # 需求文档 PRD
 │   └── ui_design/        # 界面设计图
@@ -97,13 +96,16 @@ testcase-generator/
 
 | 输入类型 | 保存位置 | 适用场景 |
 |---|---|---|
-| 需求文档 | `inputs/requirements/` | 功能需求、PRD |
+| 当前需求文档 | `inputs/requirements/current_prd.md` | 当前要生成用例的 PRD |
+| 历史需求文档 | `inputs/requirements/archive/` | 已处理或暂不使用的 PRD 归档 |
 | 界面设计 | `inputs/ui_design/` | UI 改版、交互说明 |
 
 ### 2. 提出需求
 
 在对话中提出需求，例如：
 
+- `根据 inputs/requirements/current_prd.md 的报告编制章节生成报告编制测试用例`
+- `根据 inputs/requirements/current_prd.md 的报告编制章节追加生成报告编制测试用例，请先读取已有输出文件去重`
 - `根据 inputs/requirements/business_site/annual_plan/REQ-CPV-002.md 生成年度计划测试用例`
 - `根据 inputs/ui_design/REQ-CPV-039/ 补充权限管理界面交互用例`
 
@@ -145,6 +147,9 @@ $env:PYTHONIOENCODING = 'utf-8'
 ## 脚本命令
 
 ```bash
+# 按 REQ 编号获取最小生成上下文（推荐先执行）
+python scripts/resolve_context.py --req REQ-CPV-017
+
 # 校验本次生成的用例（推荐显式指定输出文件）
 python scripts/validate_cases.py --source outputs/origin_exports/<site_type>/<module_name>_testcases.md
 
@@ -165,7 +170,7 @@ python scripts/validate_cases.py --source testcase_templates/modules
 
 - **SKILL.md**：Agent 执行规则，包含完整的生成流程和质量要求
 - **README.md**：给使用者看的快速上手说明
-- **testcase_templates/modules/**：按 CPV 一级菜单 / 二级菜单组织的参考用例库，只读使用，不保存新生成用例
+- **testcase_templates/modules/**：按站点分类和一级菜单组织的参考用例库，二级菜单维护为同名 `.md` 文件，只读使用，不保存新生成用例
 - **outputs/origin_exports/public_site/**：公共管理站点原始 Markdown 用例保存位置
 - **outputs/origin_exports/business_site/**：业务站点原始 Markdown 用例保存位置
 - **outputs/excel_exports/public_site/**：公共管理站点 Excel 导出文件保存位置
@@ -184,14 +189,15 @@ python scripts/validate_cases.py --source testcase_templates/modules
 
 | 一级菜单 | 二级菜单 | 文件路径示例 |
 |---|---|---|
-| 公共管理站点 | 站点管理 | `testcase_templates/modules/public_site/site_manage/` |
-| 公共管理站点 | 用户管理 | `testcase_templates/modules/public_site/user_manage/` |
-| 公共管理站点 | 权限管理 | `testcase_templates/modules/public_site/permission_manage/` |
-| 业务站点 | 年度计划设置 | `testcase_templates/modules/business_site/plan_manage/annual_plan_settings/` |
-| 业务站点 | 任务管理 | `testcase_templates/modules/business_site/plan_manage/task_manage/` |
-| 业务站点 | 方案模板 | `testcase_templates/modules/business_site/scheme_manage/scheme_templates/` |
-| 业务站点 | 方案编制 | `testcase_templates/modules/business_site/scheme_manage/scheme_formulation/` |
-| 业务站点 | 数据管理与洞察 | `testcase_templates/modules/business_site/data_manage_insights/` |
-| 业务站点 | 报告生成 | `testcase_templates/modules/business_site/report_manage/report_generation/` |
+| 公共管理站点 | 审计追踪 / 权限管理 | `testcase_templates/modules/public_site/audit_trail/audit_trail_permission_manage.md` |
+| 业务站点 | 配置管理 / 审计追踪 | `testcase_templates/modules/business_site/configuration_manage/audit_trail.md` |
+| 业务站点 | 年度计划设置 | `testcase_templates/modules/business_site/plan_manage/annual_plan_settings.md` |
+| 业务站点 | 任务管理 | `testcase_templates/modules/business_site/plan_manage/task_manage.md` |
+| 业务站点 | 方案模板 | `testcase_templates/modules/business_site/scheme_manage/scheme_templates.md` |
+| 业务站点 | 方案编制 | `testcase_templates/modules/business_site/scheme_manage/scheme_formulation.md` |
+| 业务站点 | 关联分析 | `testcase_templates/modules/business_site/scheme_execution/correlation_analysis.md` |
+| 业务站点 | 监控项目 | `testcase_templates/modules/business_site/scheme_execution/monitoring_items.md` |
+| 业务站点 | 报告生成 | `testcase_templates/modules/business_site/report_manage/report_generation.md` |
+| 业务站点 | 报告模板 | `testcase_templates/modules/business_site/report_manage/report_templates.md` |
 
-每个菜单目录下优先放置 `module_overview.md` 和 `testcases.md`。目录名必须全部小写，不带空格，以 `_` 分隔单词。如果某个一级菜单下暂时没有二级菜单拆分，也可以直接在 `testcase_templates/modules/<level1_menu>/` 下放置兜底参考文件。
+参考文件路径以 `testcase_templates/modules/menu_index.md` 为准。`public_site/` 和 `business_site/` 下只维护一级菜单目录；一级菜单下的二级菜单用 `<level2_menu>.md` 文件维护。目录名和文件名必须全部小写，不带空格，以 `_` 分隔单词。

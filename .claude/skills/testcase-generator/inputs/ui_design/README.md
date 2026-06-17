@@ -24,15 +24,15 @@ ui_design/
 ```
 
 - UI 原图必须放在 `inputs/ui_design/` 下，`docx/` 仅作为临时杂文件目录，不作为 UI 来源。
-- 新收到但未确认归属的图片先放入 `_incoming/`。
+- 新收到但未确认归属的图片可先放入 `_incoming/`，确认后人工移动到对应 `REQ-*` 目录。
 - `REQ-*` 目录由 `scripts/split_requirements.py` 自动创建。
 - 每个 `README.md` 记录关联需求、图片清单、页面说明和交互说明。
-- 文件名无法匹配需求编号的图片先记录到 `_unassigned/README.md`，人工确认后再移动到对应需求目录。
+- `_unassigned/README.md` 仅作为人工整理清单，不由拆分脚本自动维护。
 
 生成方式：
 
 ```bash
-python scripts/split_requirements.py --prd "inputs/requirements/CPV产品规格说明书 (0615).md" --ui-source "inputs/ui_design/_incoming"
+python scripts/split_requirements.py --prd "inputs/requirements/current_prd.md" --overwrite
 ```
 
 ## 阅读重点

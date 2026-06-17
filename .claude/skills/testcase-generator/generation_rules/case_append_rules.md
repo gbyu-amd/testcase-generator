@@ -19,8 +19,8 @@
 ## 补充生成流程
 
 1. 判断新需求所属站点分类和功能模块，确认模块名和输出文件路径。
-2. 按 CPV 一级菜单 / 二级菜单确定参考目录，优先读取 `testcase_templates/modules/<level1_menu>/<level2_menu>/module_overview.md`（只读参考，不修改）。
-3. 读取同目录下的 `testcases.md`；若二级菜单目录不存在，再尝试读取 `testcase_templates/modules/<level1_menu>/module_overview.md` 和 `testcases.md`（只读参考，不修改）。
+2. 读取 `testcase_templates/modules/menu_index.md`，按 CPV 菜单路径匹配参考文件。
+3. 读取索引命中的 `testcase_templates/modules/<site_type>/<level1_menu>/<level2_menu>.md`；若索引未命中，再读取该一级菜单目录下最相关的 `.md` 参考文件（只读参考，不修改）。
 4. 若输出文件已存在，读取其中所有已有用例的分组、用例名称、前置条件和预期结果，用于去重判断。
 5. 按去重规则（见下节）逐一判断新场景是否与已有用例重复。
 6. 非重复的新场景，按编号递增规则（见 `testcase_id_rules.md`）在输出文件中追加。
@@ -30,14 +30,14 @@
 
 ---
 
-## 菜单目录匹配规则
+## 菜单参考文件匹配规则
 
-- `testcase_templates/modules/` 按 CPV 一级菜单 / 二级菜单组织。
-- 目录名必须全部小写，不带空格，以 `_` 分隔单词。
-- 标准二级菜单参考目录：`testcase_templates/modules/<level1_menu>/<level2_menu>/`。
-- 一级菜单下允许放置兜底参考文件：`testcase_templates/modules/<level1_menu>/module_overview.md` 和 `testcases.md`。
-- 新需求跨多个二级菜单时，必须读取所有相关二级菜单目录的 `testcases.md`，用于去重和补充场景判断。
-- 找不到对应菜单参考目录时，不阻塞生成；应记录缺失参考资料和生成假设。
+- `testcase_templates/modules/` 按站点分类和 CPV 一级菜单组织。
+- `public_site/` 和 `business_site/` 下只维护一级菜单目录。
+- 二级菜单参考用例维护为一级菜单目录下的 `<level2_menu>.md` 文件。
+- 目录名和文件名必须全部小写，不带空格，以 `_` 分隔单词。
+- 新需求跨多个二级菜单时，必须读取所有相关 `.md` 参考文件，用于去重和补充场景判断。
+- 找不到对应菜单参考文件时，不阻塞生成；应记录缺失参考资料和生成假设。
 
 ---
 
