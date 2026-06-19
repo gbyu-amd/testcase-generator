@@ -35,7 +35,7 @@ python scripts/resolve_context.py --req REQ-CPV-xxx
 2. 若用户指定 `REQ-CPV-xxx`，执行 `scripts/resolve_context.py --req REQ-CPV-xxx` 并按返回清单读取
 3. `generation_rules/quick_rules.md`
 4. 用户本次指定的需求文件、章节、界面设计图或补充说明
-5. `knowledge_base/project_overview.md`、`business_glossary.md`、`user_roles.md`、`common_business_rules.md`（信息不足时读取）
+5. `knowledge_base/project_overview.md`、`business_glossary.md`、`user_roles.md`（信息不足时读取）
 6. `knowledge_base/core_flows/` 下的相关流程（按需读取）
 7. `testcase_templates/modules/menu_index.md` 和命中的参考文件（按需读取）
 8. `testcase_templates/common_templates/` 下的通用模板（按用例类型选用）
@@ -54,7 +54,6 @@ python scripts/resolve_context.py --req REQ-CPV-xxx
 
 | 模板文件 | 适用场景 | 对应用例类型 |
 |---|---|---|
-| `functional_testcase_template.md` | 生成正向主流程用例时，参考字段填写要求和示例 | 正向 |
 | `negative_flow_testcase_template.md` | 生成异常、权限、状态变化用例时，参考异常场景清单和预期结果写法 | 异常、权限 |
 | `boundary_value_testcase_template.md` | 生成边界值用例时，参考最小值/最大值/越界的覆盖要求 | 边界 |
 | `compatibility_testcase_template.md` | 生成兼容性用例时，参考环境描述和关键元素验证要求 | 兼容 |
@@ -207,7 +206,7 @@ python scripts/resolve_context.py --req REQ-CPV-xxx
 - 来自需求文档、PRD、验收标准或用户补充需求的用例，填写 `来源：需求文档`。
 - 来自 UI 设计图、截图、原型图或界面交互说明的用例，填写 `来源：UI设计图`。
 - 来自核心流程、业务规则、覆盖维度规则、优先级规则或具体知识库文件的用例，必须写清具体来源，例如 `来源：data_analysis_flow.md`、`来源：coverage_dimension_rules.md-合规追溯`、`来源：priority_rules.md-P0`。
-- 同一条用例参考多个来源时，用分号分隔，例如 `来源：需求文档；来源：UI设计图；来源：common_business_rules.md`。
+- 同一条用例参考多个来源时，用分号分隔，例如 `来源：需求文档；来源：UI设计图；来源：data_analysis_flow.md`。
 - `备注` 不得为空，不得填写 `无`，不得只写"通用""综合"等不可追溯来源。
 
 ### 文件保存位置

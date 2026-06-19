@@ -113,7 +113,7 @@
 | 备注：来源：data_analysis_flow.md | 来自 `knowledge_base/core_flows/` 下的核心业务流程 |
 | 备注：来源：coverage_dimension_rules.md-合规追溯 | 来自覆盖维度规则中的具体维度 |
 | 备注：来源：priority_rules.md-P0 | 来自优先级规则中的高风险判定 |
-| 备注：来源：需求文档；来源：UI设计图；来源：common_business_rules.md | 同一用例同时参考多个来源 |
+| 备注：来源：需求文档；来源：UI设计图；来源：data_analysis_flow.md | 同一用例同时参考多个来源 |
 
 `备注` 来源必须可追溯，不允许为空，不允许只写"通用""综合""业务规则"或"核心流程"。如来源是流程或规则，必须写到具体文件或具体规则名称。
 
