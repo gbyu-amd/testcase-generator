@@ -4,36 +4,27 @@
 
 本目录用于存放 CPV 系统的界面设计图、截图说明、交互说明、流程图、弹窗说明和视觉标注文档。设计资料可覆盖公共管理站点、自定义业务站点、年度计划、任务、方案、监控项目、数据分析、一键分析、报告编制、审计追踪、电子签名和异步任务等页面。
 
-## 推荐目录结构
+## 目录结构
 
-UI 目录应按拆分后的需求编号组织，便于和 `inputs/requirements/**/REQ-*.md` 一一对应：
+UI 图按章节名（与 PRD 章节名保持一致）组织，直接对应提示词中的章节名：
 
 ```text
 ui_design/
+  报告编制/
+    报告列表页.png
+    报告审批弹窗.png
+  年度计划/
+    计划创建表单.png
+  权限管理/
+    角色配置页.png
   _incoming/
-    README.md
-    待归类图片.png
-  REQ-CPV-001/
-    README.md
-    01_list.png
-    02_detail.png
-  REQ-CPV-002/
-    README.md
-  _unassigned/
-    README.md
+    README.md        # 收到图但还未确认归属时先放这里
 ```
 
-- UI 原图必须放在 `inputs/ui_design/` 下，`docx/` 仅作为临时杂文件目录，不作为 UI 来源。
-- 新收到但未确认归属的图片可先放入 `_incoming/`，确认后人工移动到对应 `REQ-*` 目录。
-- `REQ-*` 目录由 `scripts/split_requirements.py` 自动创建。
-- 每个 `README.md` 记录关联需求、图片清单、页面说明和交互说明。
-- `_unassigned/README.md` 仅作为人工整理清单，不由拆分脚本自动维护。
-
-生成方式：
-
-```bash
-python scripts/split_requirements.py --prd "inputs/requirements/current_prd.md" --overwrite
-```
+- 目录名使用中文章节名，与提示词一致，AI 可直接按章节名定位
+- 原始 Word 文件统一放在 `inputs/requirements/raw_docs/`，不放在本目录
+- 新收到但未确认归属的图片先放入 `_incoming/`，确认后人工移入对应章节目录
+- 目录由人工创建和维护，无需运行脚本
 
 ## 阅读重点
 

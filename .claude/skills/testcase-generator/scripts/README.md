@@ -7,9 +7,7 @@
 ## 脚本列表
 
 - `case_utils.py`：公共工具模块，提供表头定义、路径安全检查、Markdown 表格解析和文件发现逻辑，不需要直接运行。
-- `context_config.py`：上下文映射配置，集中维护模块识别、输出文件、参考用例、核心流程和规则清单，不需要直接运行。
-- `split_requirements.py`：将整份 Markdown PRD 按章节拆成独立需求文件，生成需求索引，并为每个需求创建对应 UI 目录 README。
-- `resolve_context.py`：按 `REQ-CPV-xxx` 解析生成用例所需的最小上下文，包括需求文件、UI 目录、输出文件、参考用例和校验/导出命令。
+- `convert_docx.py`：将 Word (.docx) 文档转换为 Markdown，忽略所有图片。支持提取指定章节（`--section`）和直接打印输出（`--print`），供 AI 在不手动转换文件的情况下直接读取 Word 内容。
 - `validate_cases.py`：检查标准表头、字段完整性、优先级、重复用例名称和重复流程，支持 ERROR/WARN 分级、JSON 输出和安全格式修复。
 - `export_testcases.py`：将模块 Markdown 用例导出为 Excel 表格文件，导出前会先执行完整校验。
 
@@ -26,56 +24,6 @@
 
 脚本只负责机械校验和安全格式修复；前置条件、预期结果、重复用例、优先级和用例描述等业务语义问题应由 Agent 或测试人员根据资料修复。
 
-## 需求拆分脚本
-
-### 按整份 PRD 拆分需求
-
-```bash
-python scripts/split_requirements.py --prd "inputs/requirements/current_prd.md"
-```
-
-默认按 3/4 级标题拆分小章节，生成：
-
-- `inputs/requirements/requirements_index.md`
-- `inputs/requirements/<site_type>/<module_slug>/REQ-CPV-xxx.md`
-- `inputs/ui_design/REQ-CPV-xxx/README.md`
-
-拆分脚本只初始化 `inputs/ui_design/REQ-CPV-xxx/README.md`，不再自动扫描、复制或归类 UI 图片。UI 素材由人工确认后直接放入对应 `REQ-CPV-xxx` 目录，并更新该目录 README。
-
-默认使用短编号文件名，避免 Windows 长路径问题。若确实需要在文件名中追加标题，可增加 `--include-title-in-name`。
-
-### 重建拆分文件
-
-```bash
-python scripts/split_requirements.py --prd "inputs/requirements/current_prd.md" --overwrite
-```
-
-首次拆分后建议先检查 `requirements_index.md`，确认章节边界、站点分类、模块目录和 UI 归属，再基于单个 `REQ-*` 文件生成测试用例。
-
-## 快速上下文解析
-
-### 按 REQ 编号获取最小读取清单
-
-```bash
-python scripts/resolve_context.py --req REQ-CPV-017
-```
-
-输出内容包括：
-
-- 单需求文件路径
-- UI 目录及是否存在实际 UI 素材
-- Markdown 输出文件路径
-- 命中的参考用例文件
-- 优先读取的快速规则
-- 校验和导出命令
-
-### 输出 JSON
-
-```bash
-python scripts/resolve_context.py --req REQ-CPV-017 --json
-```
-
-Agent 生成单个需求用例时，优先使用本脚本结果，避免反复搜索 `requirements_index.md`、`menu_index.md`、输出目录和 UI 目录。
 
 ## 校验用例脚本
 

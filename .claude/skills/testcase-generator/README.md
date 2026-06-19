@@ -18,10 +18,16 @@ testcase-generator/
 │       ├── menu_index.md # 菜单路径到参考文件的索引
 │       └── <site_type>/<level1_menu>/<level2_menu>.md
 ├── inputs/               # 输入层：本次生成的素材
-│   ├── requirements/     # 需求文档 PRD
-│   └── ui_design/        # 界面设计图
-├── scripts/              # 脚本层：需求拆分、机器校验和导出
-│   ├── split_requirements.py # 拆分整份 PRD 并创建 UI 目录
+│   ├── requirements/     # 需求文档
+│   │   ├── raw_docs/     # 原始 Word 文档（.docx）
+│   │   ├── current_prd.md# 当前 Markdown PRD（由 convert_docx.py 生成）
+│   │   └── archive/      # 历史 PRD 归档
+│   └── ui_design/        # 界面设计图，按章节名组织
+│       ├── 报告编制/      # 目录名 = PRD 章节名
+│       ├── 年度计划/
+│       └── _incoming/    # 待归类图片
+├── scripts/              # 脚本层：转换、校验和导出
+│   ├── convert_docx.py   # Word 转 Markdown（忽略图片），支持按章节提取
 │   ├── validate_cases.py # 校验格式、质量、编号
 │   └── export_testcases.py # 导出 Excel
 └── outputs/              # 输出层
@@ -36,30 +42,28 @@ testcase-generator/
 ## 工作流程
 
 ```
-用户提供输入文档
+用户提供 Word 文件 + 章节名
        │
        ▼
-① AI 读取知识层和规则层
-   理解业务背景、用户角色、模块流程、编写规范
+① AI 提取章节内容（convert_docx.py --section --print）
+   无需用户手动转换，图片自动忽略
        │
        ▼
-② AI 读取参考用例（只读）
-   了解该模块已有哪些场景，避免重复生成
+② AI 读取同名 UI 图目录（inputs/ui_design/<章节名>/）
+   目录存在且有图片时读取，否则跳过
        │
        ▼
-③ AI 分析输入文档
-   提取页面入口、主流程、分支流程、字段规则、
-   按钮状态、异常提示、数据依赖
+③ AI 读取规则层和参考用例（只读）
+   了解编写规范、该模块已有哪些场景
        │
        ▼
 ④ AI 生成用例
-   按 9 个覆盖维度设计场景，附需求覆盖率对照表，
+   按覆盖维度设计场景，附需求覆盖率对照表，
    保存为 Markdown
        │
        ▼
 ⑤ 脚本校验（validate_cases.py）
-   检查编号格式、字段完整性、预期结果质量、
-   场景重复、核心链路关键场景覆盖等
+   检查字段完整性、预期结果质量、场景重复等
        │
       有 ERROR？── 是 ──▶ AI 修复 ──▶ 重新校验
        │ 否
@@ -94,20 +98,29 @@ testcase-generator/
 
 ### 1. 准备输入文件
 
-| 输入类型 | 保存位置 | 适用场景 |
+| 输入类型 | 保存位置 | 说明 |
 |---|---|---|
-| 当前需求文档 | `inputs/requirements/current_prd.md` | 当前要生成用例的 PRD |
-| 历史需求文档 | `inputs/requirements/archive/` | 已处理或暂不使用的 PRD 归档 |
-| 界面设计 | `inputs/ui_design/` | UI 改版、交互说明 |
+| 原始 Word 文档 | `inputs/requirements/raw_docs/` | 产品经理提供的 .docx，AI 自动提取章节内容 |
+| UI 设计图 | `inputs/ui_design/<章节名>/` | 目录名与 PRD 章节名一致，AI 自动匹配读取 |
+| 历史 PRD 归档 | `inputs/requirements/archive/` | 已处理过的历史版本 |
 
 ### 2. 提出需求
 
-在对话中提出需求，例如：
+直接在对话中说明 Word 文件和章节名，无需手动执行任何脚本：
 
-- `根据 inputs/requirements/current_prd.md 的报告编制章节生成报告编制测试用例`
-- `根据 inputs/requirements/current_prd.md 的报告编制章节追加生成报告编制测试用例，请先读取已有输出文件去重`
-- `根据 inputs/requirements/business_site/annual_plan/REQ-CPV-002.md 生成年度计划测试用例`
-- `根据 inputs/ui_design/REQ-CPV-039/ 补充权限管理界面交互用例`
+```
+根据 inputs/requirements/raw_docs/tangyao_prd.docx 的"报告编制"章节生成测试用例
+```
+
+```
+根据 inputs/requirements/raw_docs/tangyao_prd.docx 的"权限管理"章节追加生成测试用例
+```
+
+不确定章节名时，可以先问：
+
+```
+tangyao_prd.docx 里有哪些章节？
+```
 
 ### 3. 获取输出
 
@@ -117,40 +130,50 @@ Agent 会自动完成校验和导出，最终输出：
 
 ## Python 环境要求
 
-脚本仅使用 Python 标准库，无需安装第三方依赖。建议使用 Python 3.10 或更高版本。
+大部分脚本仅使用 Python 标准库，建议使用 Python 3.10 或更高版本。
 
-如团队希望在 Windows、macOS 或 Linux 上隔离运行环境，可选创建虚拟环境：
+`convert_docx.py` 需要额外安装 `python-docx`，其余脚本无需额外依赖。
 
-```bash
-python -m venv .venv
-```
+### 初始化虚拟环境
 
-Windows PowerShell 激活：
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-macOS / Linux 激活：
+**macOS / Linux：**
 
 ```bash
+python3 -m venv .venv
 source .venv/bin/activate
+pip install python-docx
 ```
 
-如果 Windows PowerShell 中文路径或中文输出仍异常，运行脚本前设置：
+激活后直接用 `python` 运行脚本即可。
+
+**Windows：**
+
+> 注意：项目路径较长时，Windows 长路径限制会导致在项目目录内创建虚拟环境失败。建议在短路径下创建，例如 `C:\venv\testcase`。
 
 ```powershell
-$env:PYTHONUTF8 = '1'
-$env:PYTHONIOENCODING = 'utf-8'
+python -m venv C:\venv\testcase
+C:\venv\testcase\Scripts\pip install python-docx
+```
+
+运行脚本时用完整路径：
+
+```powershell
+C:\venv\testcase\Scripts\python scripts/convert_docx.py ...
 ```
 
 ## 脚本命令
 
 ```bash
-# 按 REQ 编号获取最小生成上下文（推荐先执行）
-python scripts/resolve_context.py --req REQ-CPV-017
+# 列出 Word 文档所有章节（不确定章节名时先执行）
+python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --list-sections
 
-# 校验本次生成的用例（推荐显式指定输出文件）
+# 提取指定章节内容并打印（AI 自动调用，无需手动执行）
+python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --section "<章节名>" --print
+
+# 将 Word 文档整体转换为 Markdown（手动更新 current_prd.md 时使用）
+python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --overwrite
+
+# 校验本次生成的用例
 python scripts/validate_cases.py --source outputs/origin_exports/<site_type>/<module_name>_testcases.md
 
 # 导出 Excel（校验通过后执行）

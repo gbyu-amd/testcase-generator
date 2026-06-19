@@ -56,13 +56,11 @@ from validate_cases import (
     validate_case_rows,
     validate_core_flow_coverage,
     validate_duplicates,
-    validate_id_sequence,
 )
 
 INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 
 # Excel 样式索引（对应 styles_xml 中 cellXfs 的顺序）
-_STYLE_DEFAULT = 0   # 未使用的默认样式占位
 _STYLE_HEADER = 1    # 表头：加粗、绿色背景、居中
 _STYLE_DATA = 2      # 数据行：带边框、顶部对齐、自动换行
 SITE_TYPES = ("public_site", "business_site")
@@ -134,8 +132,8 @@ def styles_xml() -> str:
     return '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <fonts count="2">
-    <font><sz val="11"/><name val="Microsoft YaHei"/></font>
-    <font><b/><sz val="11"/><name val="Microsoft YaHei"/><color rgb="FFFFFFFF"/></font>
+    <font><sz val="11"/></font>
+    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/></font>
   </fonts>
   <fills count="3">
     <fill><patternFill patternType="none"/></fill>
@@ -225,8 +223,10 @@ def write_xlsx(output_path: Path, cases: list[dict[str, str]]) -> None:
             archive.writestr(archive_path, content)
 
 
-def default_output_path(output_dir: Path) -> Path:
+def default_output_path(output_dir: Path, source_file: Path | None = None) -> Path:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    if source_file is not None:
+        return output_dir / f"{source_file.stem}_{timestamp}.xlsx"
     return output_dir / f"测试用例导出_{timestamp}.xlsx"
 
 
@@ -341,7 +341,9 @@ def main(argv: list[str]) -> int:
         export_groups = []
         for site_type, files in sorted(groups.items(), key=lambda item: item[0] or ""):
             group_output_dir = output_dir / site_type if site_type else output_dir
-            export_groups.append((site_type or "未分类", files, default_output_path(group_output_dir)))
+            # 单文件时用 MD 文件名，多文件合并时用时间戳
+            source_file = files[0] if len(files) == 1 else None
+            export_groups.append((site_type or "未分类", files, default_output_path(group_output_dir, source_file)))
 
     exported_count = 0
     for group_name, group_files, output_path in export_groups:
@@ -363,7 +365,6 @@ def main(argv: list[str]) -> int:
         ]
         validation_issues.extend(validate_case_rows(cases))
         validation_issues.extend(validate_duplicates(cases))
-        validation_issues.extend(validate_id_sequence(cases))
         validation_issues.extend(validate_core_flow_coverage(cases))
 
         if validation_issues:

@@ -30,7 +30,7 @@
 
 示例：
     python scripts/validate_cases.py
-    python scripts/validate_cases.py --source outputs/origin_exports/cart_testcases.md
+    python scripts/validate_cases.py --source outputs/origin_exports/business_site/report_testcases.md
     python scripts/validate_cases.py --fix
     python scripts/validate_cases.py --json
     python scripts/validate_cases.py --source testcase_templates/modules
@@ -477,11 +477,6 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
     return issues
 
 
-def validate_id_sequence(cases: list[dict[str, str]]) -> list[Issue]:
-    """图片版输出表头不包含用例编号，因此不再校验编号连续性。"""
-    return []
-
-
 def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
     """CPV 核心业务模块应覆盖约定的关键场景关键词，缺失时给出 WARN。"""
     issues: list[Issue] = []
@@ -701,7 +696,6 @@ def main(argv: list[str]) -> int:
 
     issues.extend(validate_case_rows(cases))
     issues.extend(validate_duplicates(cases))
-    issues.extend(validate_id_sequence(cases))
     issues.extend(validate_core_flow_coverage(cases))
 
     if args.json:

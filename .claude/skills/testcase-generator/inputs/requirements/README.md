@@ -4,62 +4,43 @@
 
 本目录用于存放 CPV 系统的产品需求文档、需求变更说明、版本说明、功能补充说明和验收标准。需求可覆盖公共管理站点、自定义业务站点、年度计划、任务、方案、监控项目、数据分析、一键分析、报告编制、审计追踪、电子签名和异步任务等模块。
 
-## 推荐结构
-
-日常生成用例采用轻量工作流：`current_prd.md` 只放当前要处理的 PRD，历史 PRD 放入 `archive/`。
+## 目录结构
 
 ```text
 requirements/
-  current_prd.md
+  current_prd.md        # 当前 PRD（Markdown，由 convert_docx.py 生成）
   archive/
-    PM-A_YYYYMMDD.md
+    PM-A_YYYYMMDD.md    # 历史 PRD 归档
     PM-B_YYYYMMDD.md
-  requirements_index.md       # 可选：拆分索引
-  public_site/
-    audit_trail/
-      REQ-CPV-001.md          # 可选：拆分后单需求
-  business_site/
-    data_analysis/
-      REQ-CPV-002.md          # 可选：拆分后单需求
 ```
 
-`current_prd.md` 是固定当前输入入口。更换产品经理提供的新 PRD 时，先将当前 `current_prd.md` 复制到 `archive/` 归档，再替换 `current_prd.md` 内容。
+原始 Word 文件统一放在 `inputs/requirements/raw_docs/`，不放在本目录。
+
+更换 PRD 时：
+
+1. 将新 Word 文件放入 `inputs/requirements/raw_docs/`
+2. 将当前 `current_prd.md` 复制到 `archive/` 归档（可选）
+3. 运行转换脚本覆盖写入：`python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --overwrite`
 
 ## 生成方式
 
-### 指定章节直接生成
-
-适合两份 PRD 有交叉、但暂时不想维护合并版的场景。对话中明确 PRD 路径和章节名称，例如：
+日常推荐直接使用 Word 文件 + 章节名，无需手动转换：
 
 ```text
-根据 inputs/requirements/current_prd.md 的“报告编制”章节生成报告编制测试用例。
+根据 inputs/requirements/raw_docs/tangyao_prd.docx 的”报告编制”章节生成测试用例
 ```
 
-如果输出文件已存在，优先选择“追加”，并要求先读取已有输出文件去重：
+也可以使用已转换的 Markdown PRD：
 
 ```text
-根据 inputs/requirements/current_prd.md 的“报告编制”章节追加生成报告编制测试用例。
-请先读取 outputs/origin_exports/business_site/report_testcases.md，避免重复。
+根据 inputs/requirements/current_prd.md 的”报告编制”章节生成报告编制测试用例
 ```
 
-### 拆分后生成
+如果输出文件已存在，优先选择”追加”并指定去重：
 
-如需按 `REQ-*` 文件精细管理，可先拆分当前 PRD：
-
-## 自动拆分
-
-在技能根目录执行：
-
-```bash
-python scripts/split_requirements.py --prd "inputs/requirements/current_prd.md" --overwrite
-```
-
-脚本默认按 3/4 级标题拆分需求，并为每个需求创建对应 UI 目录 README。拆分后必须先检查 `requirements_index.md`，确认章节边界、站点分类、模块目录、输出文件和 UI 归属。
-
-`requirements_index.md` 已包含 `输出文件` 列。按单个需求生成用例时，优先使用上下文解析脚本获取最小读取清单：
-
-```bash
-python scripts/resolve_context.py --req REQ-CPV-017
+```text
+根据 inputs/requirements/raw_docs/tangyao_prd.docx 的”报告编制”章节追加生成测试用例，
+请先读取 outputs/origin_exports/business_site/report_testcases.md 避免重复
 ```
 
 ## 阅读重点
