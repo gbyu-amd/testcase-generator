@@ -17,7 +17,7 @@
 
 - 同一输出文件内，分组命名必须稳定，不要同一模块混用多个叫法。
 - 同一分组下 `用例名称` 不允许重复。
-- 跨模块联动用例以主操作所在模块作为分组，其他模块写入 `备注` 或 `用例标签`。
+- 跨模块联动用例以主操作所在模块作为分组，其他模块写入 `备注` 或需求覆盖率对照表；`用例标签` 只保留难度等级。
 
 ## 用例描述建议值
 
@@ -36,7 +36,7 @@
 | 推荐二级分组 | 适用范围 | 输出路径示例 |
 |---|---|---|
 | 登录与站点 | 登录、站点下拉、公共管理/自定义站点跳转、统一认证、会话失效 | `public_site/login_site_testcases.md` |
-| 公共管理 | 统一门户、站点管理、全局用户、权限管理、系统服务管理 | `public_site/public_site_testcases.md` |
+| 公共管理 | 统一门户、站点管理、用户管理、权限管理、系统服务管理 | `public_site/public_site_testcases.md` |
 | 产品与基础数据 | 产品、工艺路线、CPP、CQA、CMA、IPC、基础字典、导入导出 | `business_site/product_master_data_testcases.md` |
 | 年度计划与任务 | 年度计划、周期性任务、任务日历、任务进度、任务关闭 | `business_site/annual_plan_task_testcases.md` |
 | 方案编制 | 方案模板、方案创建、提交、审批、退回、生效、升版 | `business_site/protocol_testcases.md` |
