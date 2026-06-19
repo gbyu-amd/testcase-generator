@@ -12,10 +12,18 @@ requirements/
 
 ## 日常使用
 
-直接在对话中指定 Word 文件和章节名，AI 自动提取内容生成用例，无需手动执行任何脚本：
+在对话中指定章节名，AI 自动提取内容生成用例，无需手动执行任何脚本。支持两种方式：
+
+**直接使用 Word 文件（推荐）：**
 
 ```text
 根据 inputs/requirements/raw_docs/tangyao_prd.docx 的"报告编制"章节生成测试用例
+```
+
+**使用已转换的 Markdown PRD：**
+
+```text
+根据 inputs/requirements/current_prd.md 的"报告编制"章节生成测试用例
 ```
 
 更换 PRD 时：

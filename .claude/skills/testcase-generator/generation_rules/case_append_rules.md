@@ -1,18 +1,48 @@
-# 用例补充生成规则
+# 用例生成与去重规则
 
-## 补充 vs 新建：先判断输出文件是否存在
+本文件适用于所有生成场景（新建、追加、覆盖），每次生成必读。
 
-**文件不存在** → 直接新建，使用标准表头写入新用例，不新增独立用例编号字段。
+## 输出文件冲突处理
 
-**文件已存在** → 不得静默覆盖，必须向用户说明文件已存在，并等待用户从以下三个选项中明确选择：
+**文件不存在** → 直接新建，使用标准表头写入新用例，不新增独立用例编号字段。新建时同样需执行去重规则，确保本次生成的用例内部无冗余。
+
+**文件存在但为空或没有有效用例表** → 视为初始化占位文件，可直接覆盖写入标准表头和新生成用例，不需要触发追加 / 覆盖 / 另存确认。
+
+**文件已存在且包含有效用例表** → 不得静默覆盖，必须向用户说明文件已存在，并等待用户从以下三个选项中明确选择：
 
 | 选项 | 说明 | 字段处理 |
 |---|---|---|
 | **追加** | 保留现有用例，在文件末尾补充本次新场景 | 保持标准表头 |
 | **覆盖** | 清空现有文件，重新生成全量用例 | 使用标准表头 |
-| **另存** | 保留现有文件，本次用例另存为 `<module_name>_testcases_YYYYMMDD_HHMMSS.md` | 使用标准表头 |
+| **另存** | 保留现有文件，本次用例另存为带时间戳的新文件 `<module_name>_testcases_YYYYMMDD_HHMMSS.md`（仅另存时才带时间戳） | 使用标准表头 |
 
 收到用户明确选择后，再按对应规则继续生成。
+
+---
+
+## 输出路径与模块命名规则
+
+| 推荐二级分组 | 适用范围 | 输出路径示例 |
+|---|---|---|
+| 登录与站点 | 登录、站点下拉、公共管理 / 自定义站点跳转、统一认证、会话失效 | `public_site/login_site_testcases.md` |
+| 公共管理 | 统一门户、站点管理、用户管理、权限管理、系统服务管理 | `public_site/public_site_testcases.md` |
+| 产品与基础数据 | 产品、工艺路线、CPP、CQA、CMA、IPC、基础字典、导入导出 | `business_site/product_master_data_testcases.md` |
+| 年度计划与任务 | 年度计划、周期性任务、任务日历、任务进度、任务关闭 | `business_site/annual_plan_task_testcases.md` |
+| 方案编制 | 方案模板、方案创建、提交、审批、退回、生效、升版 | `business_site/protocol_testcases.md` |
+| 监控项目 | 监控项目生成、状态流转、分析前置、结果确认、重新分析 | `business_site/monitoring_item_testcases.md` |
+| 数据分析 | 文件上传校验、插件状态、算法配置、图表配置、结果保存 / 回传 | `business_site/data_analysis_testcases.md` |
+| 一键分析 | 替换数据源、字段匹配、处理规则同步、批量分析、未分析原因 | `business_site/one_click_analysis_testcases.md` |
+| 报告编制 | 报告模板、报告创建、结果引用、审批、生效、导出、任务回推 | `business_site/report_testcases.md` |
+| 审计与电子签名 | 审计追踪、电子签名、操作前后值、失败原因、合规追溯 | 按所属站点选择 `public_site/audit_esignature_testcases.md` 或 `business_site/audit_esignature_testcases.md` |
+| 系统配置与异步任务 | 工作流配置、异步任务、导入导出、失败重试 | 按所属站点选择 `public_site/system_config_async_task_testcases.md` 或 `business_site/system_config_async_task_testcases.md` |
+
+确定输出文件时：
+
+1. 确定站点分类：`public_site` 或 `business_site`。
+2. 确定中文分组：一级分组、二级分组、三级分组。
+3. 确定输出文件名：`outputs/origin_exports/<site_type>/<module_name>_testcases.md`。
+4. 同一个输出文件内，分组字段和需求覆盖率对照表中的模块引用必须保持一致。
+5. 不修改 `testcase_templates/modules/` 目录。
 
 ---
 
@@ -21,7 +51,7 @@
 1. 判断新需求所属站点分类和功能模块，确认模块名和输出文件路径。
 2. 读取 `testcase_templates/modules/menu_index.md`，按 CPV 菜单路径匹配参考文件。
 3. 读取索引命中的 `testcase_templates/modules/<site_type>/<level1_menu>/<level2_menu>.md`；若索引未命中，再读取该一级菜单目录下最相关的 `.md` 参考文件（只读参考，不修改）。
-4. 若输出文件已存在，读取其中所有已有用例的分组、用例名称、前置条件和预期结果，用于去重判断。
+4. 若输出文件已存在，读取其中所有已有用例的分组、用例名称、前置条件、用例步骤和预期结果，用于去重判断。
 5. 按去重规则（见下节）逐一判断新场景是否与已有用例重复。
 6. 非重复的新场景，按标准表头在输出文件末尾追加；用例追踪使用"分组 + 用例名称"，不新增独立编号字段。
 7. 重复场景不新增用例，在本次输出中注明"已有覆盖，参见 <用例名称>"。
@@ -45,7 +75,8 @@
 
 - 追加用例必须使用与现有文件完全一致的标准表头。
 - 同一分组下 `用例名称` 不允许重复。
-- 新增用例的 `备注` 必须记录具体来源，可填写需求文档、UI 设计图、核心流程或具体规则文件。
+- 新增用例的 `备注` 必须记录具体来源，可填写需求文档、UI 设计图、用例模板、核心流程或具体规则文件。
+- 来源于参考用例模板时，写为 `来源：xxx用例模板`；来源于流程文件时，写为 `来源：xxx核心流程`，例如 `来源：监控项目用例模板`、`来源：数据分析核心流程`、`来源：一键分析核心流程`。
 - 新增用例的 `是否自动化`、`关联接口`、`用例测试类`、`关联项目` 字段必须留空。
 - 追加前必须扫描已有文件，不能凭记忆或猜测已有场景。
 
@@ -91,11 +122,12 @@
 
 如果新需求不属于现有任何模块：
 
-1. 不修改 `testcase_templates/modules/`（只读目录）。
-2. 参考 `testcase_templates/common_templates/` 下的通用模板。
-3. 基于用户提供的资料、`knowledge_base/` 和通用覆盖维度生成用例。
-4. 保存到 `outputs/origin_exports/<site_type>/<new_module_name>_testcases.md`，使用标准表头，其中 `site_type` 只能为 `public_site` 或 `business_site`。
-5. 在输出文件开头标注：
+1. 按"输出路径与模块命名规则"确定站点分类、中文分组和输出文件名。
+2. 不修改 `testcase_templates/modules/`（只读目录）。
+3. 参考 `testcase_templates/common_templates/` 下的通用模板。
+4. 基于用户提供的资料、`knowledge_base/` 和通用覆盖维度生成用例。
+5. 保存到 `outputs/origin_exports/<site_type>/<new_module_name>_testcases.md`，使用标准表头，其中 `site_type` 只能为 `public_site` 或 `business_site`。
+6. 在输出文件开头标注：
    - 该模块是扩展模块
    - 缺失的参考资料（如无 PRD、无 UI 设计图）
    - 生成假设（如"假设未登录用户访问该页面会跳转登录页"）
@@ -113,7 +145,7 @@
 | 备注：来源：data_analysis_flow.md | 来自 `knowledge_base/core_flows/` 下的核心业务流程 |
 | 备注：来源：coverage_dimension_rules.md-合规追溯 | 来自覆盖维度规则中的具体维度 |
 | 备注：来源：priority_rules.md-P0 | 来自优先级规则中的高风险判定 |
-| 备注：来源：需求文档；来源：UI设计图；来源：data_analysis_flow.md | 同一用例同时参考多个来源 |
+| 备注：来源：需求文档、UI设计图、data_analysis_flow.md | 同一用例同时参考多个来源 |
 
 `备注` 来源必须可追溯，不允许为空，不允许只写"通用""综合""业务规则"或"核心流程"。如来源是流程或规则，必须写到具体文件或具体规则名称。
 

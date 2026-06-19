@@ -226,7 +226,7 @@ def write_xlsx(output_path: Path, cases: list[dict[str, str]]) -> None:
 def default_output_path(output_dir: Path, source_file: Path | None = None) -> Path:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     if source_file is not None:
-        return output_dir / f"{source_file.stem}_{timestamp}.xlsx"
+        return output_dir / f"{source_file.stem}.xlsx"
     return output_dir / f"测试用例导出_{timestamp}.xlsx"
 
 

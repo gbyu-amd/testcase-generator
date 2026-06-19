@@ -11,7 +11,7 @@
 ```
 testcase-generator/
 ├── knowledge_base/       # 知识层：项目背景、业务术语、用户角色、各模块核心流程
-├── generation_rules/     # 规则层：编写规范、编号规则、优先级、覆盖维度、补充规则
+├── generation_rules/     # 规则层：编写规范、输出路径、优先级、覆盖维度、补充规则
 ├── testcase_templates/   # 参考层：各模块高质量参考用例（只读）
 │   ├── common_templates/ # 通用格式模板
 │   └── modules/          # CPV 菜单参考用例
@@ -28,7 +28,7 @@ testcase-generator/
 │       └── _incoming/    # 待归类图片
 ├── scripts/              # 脚本层：转换、校验和导出
 │   ├── convert_docx.py   # Word 转 Markdown（忽略图片），支持按章节提取
-│   ├── validate_cases.py # 校验格式、质量、编号
+│   ├── validate_cases.py # 校验格式、质量、优先级和重复场景
 │   └── export_testcases.py # 导出 Excel
 └── outputs/              # 输出层
     ├── origin_exports/   # 原始测试用例（Markdown）

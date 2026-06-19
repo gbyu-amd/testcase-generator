@@ -10,7 +10,7 @@
 
 适用场景：
     - 校验 Agent 新生成的输出用例。
-    - 导出 Excel 前确认字段、编号、优先级和用例类型可用。
+    - 导出 Excel 前确认字段、优先级、用例描述和追踪信息可用。
     - 通过 --source 显式校验某个文件或参考用例目录。
     - 通过 --fix 自动修复 outputs/origin_exports/ 下的 Markdown 表格格式，不修改业务语义。
     - 通过 --json 输出结构化结果，便于 Agent 根据问题明细修复用例。
@@ -150,7 +150,7 @@ class Issue:
     message: str
     file: str = ""
     line: int | None = None
-    case_id: str = ""
+    case_name: str = ""
     field: str = ""
 
 
@@ -181,7 +181,7 @@ def case_issue(
         message=message,
         file=case.get("_source_file", ""),
         line=int(source_line) if source_line.isdigit() else None,
-        case_id=case.get("用例编号", ""),
+        case_name=case.get("用例名称", ""),
         field=field,
     )
 
@@ -198,8 +198,8 @@ def format_issue(issue: Issue) -> str:
         location = f"{issue.file} "
 
     field = f" [{issue.field}]" if issue.field else ""
-    case_id = f" ({issue.case_id})" if issue.case_id else ""
-    return f"[{issue.severity}] {issue.code}: {location}{issue.message}{field}{case_id}"
+    case_name = f" ({issue.case_name})" if issue.case_name else ""
+    return f"[{issue.severity}] {issue.code}: {location}{issue.message}{field}{case_name}"
 
 
 def has_blocking_issues(issues: list[Issue], strict: bool = False) -> bool:
