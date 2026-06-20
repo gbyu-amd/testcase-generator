@@ -87,6 +87,9 @@ VAGUE_EXPECTATION_PATTERNS = [
 MIN_EXPECTATION_LENGTH = 10
 
 INVALID_SOURCE_REMARKS = {"", "无", "待填", "来源：待填"}
+INVALID_SOURCE_ATTRIBUTION_PATTERNS = [
+    re.compile(r"来源：[^；;\n]*?(?:未明确|需要确认|需确认|待确认)")
+]
 EMPTY_GENERATED_HEADERS = ["是否自动化", "关联接口", "用例测试类", "关联项目"]
 
 # CPV 核心业务模块需要覆盖的关键场景关键词（任一同义词命中即算覆盖）
@@ -352,6 +355,17 @@ def has_valid_source_remark(value: str) -> bool:
     return normalized not in INVALID_SOURCE_REMARKS and "来源：" in normalized
 
 
+def invalid_source_attribution_reason(value: str) -> str:
+    normalized = value.strip()
+    for pattern in INVALID_SOURCE_ATTRIBUTION_PATTERNS:
+        if pattern.search(normalized):
+            return (
+                "备注中的“来源：”后只能填写真实来源，不能填写“未明确/需确认”等说明；"
+                "请改为“来源：<规则或资料>；说明：需求文档未明确需要确认”"
+            )
+    return ""
+
+
 def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
     issues: list[Issue] = []
 
@@ -402,6 +416,18 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     "备注",
                 )
             )
+        elif requires_source_remark(case):
+            invalid_source_reason = invalid_source_attribution_reason(remark)
+            if invalid_source_reason:
+                issues.append(
+                    case_issue(
+                        case,
+                        "ERROR",
+                        "invalid_source_attribution",
+                        invalid_source_reason,
+                        "备注",
+                    )
+                )
 
         if requires_source_remark(case):
             filled_empty_headers = [
