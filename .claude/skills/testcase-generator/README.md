@@ -46,7 +46,7 @@ testcase-generator/
        │
        ▼
 ① AI 提取章节内容
-   - Word：convert_docx.py --section --print，图片自动忽略
+   - Word：先 convert_docx.py --overwrite 覆盖 inputs/requirements/current_prd.md，再从 current_prd.md 提取章节
    - Markdown：直接读取 inputs/requirements/current_prd.md 对应章节
        │
        ▼
@@ -85,7 +85,7 @@ testcase-generator/
 
 **参考用例只读**：`testcase_templates/` 存放高质量范例，AI 只读不写，新生成内容一律写入 `outputs/origin_exports/public_site/` 或 `outputs/origin_exports/business_site/`，模板不被污染。
 
-**完整可追溯**：每条用例通过"分组 + 用例名称"定位，并在 `备注` 中记录具体来源，例如需求文档、UI 设计图、核心流程或规则文件；生成后附需求覆盖率对照表，支持从用例反查到对应的 PRD 需求。
+**完整可追溯**：每条用例通过"分组 + 用例名称"定位，并在 `备注` 中记录具体来源，例如 `来源：prd`、`来源：UI图`、`来源：data_analysis_flow.md` 或 `来源：coverage_dimension_rules.md-合规追溯`；生成后附需求覆盖率对照表，支持从用例反查到对应的 PRD 需求。
 
 ## 适用场景
 
@@ -101,7 +101,7 @@ testcase-generator/
 
 | 输入类型 | 保存位置 | 说明 |
 |---|---|---|
-| 原始 Word 文档 | `inputs/requirements/raw_docs/` | 产品经理提供的 .docx，AI 自动提取章节内容 |
+| 原始 Word 文档 | `inputs/requirements/raw_docs/` | 产品经理提供的 .docx，正式生成前先整份转换覆盖 `current_prd.md` |
 | 当前 Markdown PRD | `inputs/requirements/current_prd.md` | 已转换或人工维护的当前 PRD，可直接按章节生成用例 |
 | UI 设计图 | `inputs/ui_design/<章节名>/` | 目录名与 PRD 章节名一致，AI 自动匹配读取 |
 | 历史 PRD 归档 | `inputs/requirements/archive/` | 已处理过的历史版本 |
@@ -136,7 +136,9 @@ tangyao_prd.docx 里有哪些章节？
 
 Agent 会自动完成校验和导出，最终输出：
 - Markdown 用例文件：`outputs/origin_exports/<site_type>/<module_name>_testcases.md`
-- Excel 文件：`outputs/excel_exports/<site_type>/测试用例导出_YYYYMMDD_HHMMSS.xlsx`
+- 分需求 Excel 文件：`outputs/excel_exports/<site_type>/<module_name>_testcases.xlsx`
+
+不带 `--source` 或传入目录批量导出时，脚本会生成 `测试用例导出_YYYYMMDD_HHMMSS.xlsx` 汇总文件；交付时默认按单个 Markdown 源文件分别导出同名 Excel。
 
 ## Python 环境要求
 
@@ -177,10 +179,10 @@ C:\venv\testcase\Scripts\python scripts/convert_docx.py ...
 # 列出 Word 文档所有章节（不确定章节名时先执行）
 python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --list-sections
 
-# 提取指定章节内容并打印（AI 自动调用，无需手动执行）
+# 临时排查章节转换问题时打印指定章节；正式生成不得用它替代 --overwrite
 python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --section "<章节名>" --print
 
-# 将 Word 文档整体转换为 Markdown（手动更新 current_prd.md 时使用）
+# 将 Word 文档整体转换为 Markdown（正式生成 Word PRD 用例前必须执行）
 python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --overwrite
 
 # 校验本次生成的用例
@@ -197,7 +199,7 @@ python scripts/validate_cases.py --source testcase_templates/modules
 ```
 
 > 不带 `--source` 时脚本会默认递归扫描 `outputs/origin_exports/` 下所有用例文件，包括 `public_site/` 和 `business_site/`；
-> 单模块生成时建议显式指定文件，避免误把其他模块用例一并校验或导出。
+> 分需求导出时必须显式指定单个 Markdown 文件，避免生成合并 Excel。
 
 ## 文件说明
 

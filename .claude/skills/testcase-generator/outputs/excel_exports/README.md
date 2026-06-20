@@ -19,6 +19,8 @@ excel_exports/
 | `outputs/origin_exports/public_site/` | `outputs/excel_exports/public_site/` |
 | `outputs/origin_exports/business_site/` | `outputs/excel_exports/business_site/` |
 
+单个 Markdown 文件作为 `--source` 时，导出同名 Excel，例如 `<module_name>_testcases.xlsx`。不带 `--source` 或传入目录批量导出时，脚本会生成 `测试用例导出_YYYYMMDD_HHMMSS.xlsx` 汇总文件；交付时默认按需求分别导出。
+
 ## 导出字段
 
 导出表格应包含以下字段：
@@ -47,5 +49,5 @@ excel_exports/
 - 同一分组下用例名称是否唯一。
 - 用例步骤是否可执行。
 - 预期结果是否可验证。
-- 新生成用例的备注是否写明具体来源，例如需求文档、UI 设计图、核心流程或规则文件。
+- 新生成用例的备注是否写明具体来源，例如 `来源：prd`、`来源：UI图`、`来源：data_analysis_flow.md` 或 `来源：coverage_dimension_rules.md-合规追溯`。
 - 新生成用例的是否自动化、关联接口、用例测试类、关联项目字段是否留空。

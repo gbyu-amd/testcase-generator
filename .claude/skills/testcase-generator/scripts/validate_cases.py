@@ -554,10 +554,15 @@ def validate_duplicates(cases: list[dict[str, str]]) -> list[Issue]:
     issues: list[Issue] = []
 
     duplicated_names = duplicate_values(
-        cases, lambda case: (case_group(case), case["用例名称"])
+        cases,
+        lambda case: (
+            case.get("_source_file", ""),
+            case_group(case),
+            case["用例名称"],
+        ),
     )
     for key, duplicated_cases in duplicated_names.items():
-        group, case_name = key
+        _, group, case_name = key
         locations = "；".join(case_location(case) for case in duplicated_cases)
         issues.append(
             text_issue(
@@ -570,6 +575,7 @@ def validate_duplicates(cases: list[dict[str, str]]) -> list[Issue]:
     duplicated_flows = duplicate_values(
         cases,
         lambda case: (
+            case.get("_source_file", ""),
             case_group(case),
             case["前置条件"],
             case["用例步骤"],
@@ -577,7 +583,7 @@ def validate_duplicates(cases: list[dict[str, str]]) -> list[Issue]:
         ),
     )
     for key, duplicated_cases in duplicated_flows.items():
-        group = key[0]
+        group = key[1]
         locations = "；".join(case_location(case) for case in duplicated_cases)
         issues.append(
             text_issue(

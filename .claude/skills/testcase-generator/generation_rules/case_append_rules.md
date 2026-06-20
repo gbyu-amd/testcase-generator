@@ -18,6 +18,8 @@
 
 收到用户明确选择后，再按对应规则继续生成。
 
+带时间戳的另存文件不会被 `validate_cases.py` 和 `export_testcases.py` 的默认扫描逻辑命中；校验或导出另存文件时，必须通过 `--source` 显式指定该文件路径。
+
 ---
 
 ## 输出路径与模块命名规则
@@ -46,7 +48,7 @@
 | 审计追踪、电子签名、操作前后值、失败原因、合规追溯 | 按所属站点选择 `public_site/audit_esignature_testcases.md` 或 `business_site/audit_esignature_testcases.md` |
 | 工作流配置、异步任务、导入导出、失败重试 | 按所属站点选择 `public_site/system_config_async_task_testcases.md` 或 `business_site/system_config_async_task_testcases.md` |
 
-命名只保留通用原则：具体分析方法或子功能可拆成更细文件；`<module_name>` 和追加子名必须使用小写英文 snake_case，不带空格；PRD 未明确菜单路径且本表无命中时，按最接近的业务域命名，并在元信息块中记录“缺失明确菜单路径”的生成假设。
+命名只保留通用原则：具体分析方法或子功能可拆成更细文件；`<module_name>` 和追加子名必须使用小写英文 snake_case，不带空格，例如 `data_analysis_paired_t_testcases.md`、`data_analysis_p_control_chart_testcases.md`。PRD 未明确菜单路径且本表无命中时，按最接近的业务域命名，并在元信息块中记录“缺失明确菜单路径”的生成假设。
 
 ---
 
@@ -78,7 +80,7 @@
 ## 追加字段规则
 
 - 追加用例必须使用与现有文件完全一致的标准表头。
-- 同一分组下 `用例名称` 不允许重复。
+- 同一输出文件的同一分组下 `用例名称` 不允许重复；不同需求拆分到不同 Markdown 文件时，可保留通用场景的相同用例名称。
 - 新增用例的 `备注` 必须按 `generation_rules/testcase_writing_guidelines.md` 的“备注、标签和关联字段”记录具体来源。
 - 新增用例的 `是否自动化`、`关联接口`、`用例测试类`、`关联项目` 字段必须留空。
 - 追加前必须扫描已有文件，不能凭记忆或猜测已有场景。

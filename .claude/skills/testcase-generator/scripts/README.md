@@ -7,7 +7,7 @@
 ## 脚本列表
 
 - `case_utils.py`：公共工具模块，提供表头定义、路径安全检查、Markdown 表格解析和文件发现逻辑，不需要直接运行。
-- `convert_docx.py`：将 Word (.docx) 文档转换为 Markdown，忽略所有图片。支持提取指定章节（`--section`）和直接打印输出（`--print`），供 AI 在不手动转换文件的情况下直接读取 Word 内容。
+- `convert_docx.py`：将 Word (.docx) 文档转换为 Markdown，忽略所有图片。正式生成用例时必须先整份转换并覆盖 `inputs/requirements/current_prd.md`；`--section --print` 仅用于临时排查章节转换问题。
 - `validate_cases.py`：检查标准表头、字段完整性、优先级、重复用例名称和重复流程，支持 ERROR/WARN 分级、JSON 输出和安全格式修复。
 - `export_testcases.py`：将模块 Markdown 用例导出为 Excel 表格文件，导出前会先执行完整校验。
 
@@ -38,7 +38,7 @@ python scripts/validate_cases.py
 ### 校验单个模块
 
 ```bash
-python scripts/validate_cases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md
+python scripts/validate_cases.py --source outputs/origin_exports/business_site/data_analysis_paired_t_testcases.md
 ```
 
 ### 输出 JSON 结果
@@ -60,7 +60,7 @@ python scripts/validate_cases.py --fix
 
 ## 导出表格脚本
 
-### 默认导出全部模块
+### 默认导出全部模块（合并汇总）
 
 在项目根目录执行：
 
@@ -68,20 +68,30 @@ python scripts/validate_cases.py --fix
 python scripts/export_testcases.py
 ```
 
-脚本会默认读取 `outputs/origin_exports/**/*_testcases.md`，包括站点分类目录下的用例文件；导出前先执行完整校验，并按站点分类导出到 `outputs/excel_exports/public_site/` 或 `outputs/excel_exports/business_site/`。
+脚本会默认读取 `outputs/origin_exports/**/*_testcases.md`，包括站点分类目录下的用例文件；导出前先执行完整校验，并按站点分类导出到 `outputs/excel_exports/public_site/` 或 `outputs/excel_exports/business_site/`。该模式会将同一站点下多个 Markdown 合并为 `测试用例导出_YYYYMMDD_HHMMSS.xlsx`，仅适合临时汇总。
 存在 `ERROR` 时会停止导出。
 
-### 指定单个模块导出
+### 指定单个模块导出（分需求交付）
 
 ```bash
-python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md
+python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_paired_t_testcases.md
 ```
+
+单文件 `--source` 会导出同名 Excel，例如 `data_analysis_paired_t_testcases.xlsx`。分需求交付时应逐个 Markdown 源文件执行该命令，不使用默认合并导出。
 
 ### 指定导出文件名
 
 ```bash
-python scripts/export_testcases.py -o data_analysis_testcases.xlsx --source outputs/origin_exports/business_site/data_analysis_testcases.md
+python scripts/export_testcases.py -o data_analysis_paired_t_testcases.xlsx --source outputs/origin_exports/business_site/data_analysis_paired_t_testcases.md
 ```
+
+### 导出并清理历史 Excel
+
+```bash
+python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_paired_t_testcases.md --clean
+```
+
+`--clean` 只清理本次输出目录下其他 `.xlsx` 文件，使用前需确认不会删除仍需保留的交付文件。
 
 ### 启用严格校验
 
@@ -90,6 +100,12 @@ python scripts/export_testcases.py --strict
 ```
 
 启用 `--strict` 后，只要存在 `ERROR` 或 `WARN`，脚本都会停止导出。
+
+## 文件发现规则
+
+- 默认只扫描文件名以 `_testcases.md` 结尾的 Markdown。
+- 另存文件若使用 `<module_name>_testcases_YYYYMMDD_HHMMSS.md` 命名，不会被默认扫描；校验或导出时必须通过 `--source` 显式指定。
+- `export_testcases.py` 导出时会按 `difficulty_level_rules.md` 校正 Excel 中的 `用例标签`。若 Markdown 源文件也要求 0 WARN，应先根据 `validate_cases.py` 的 WARN 明细修复源文件。
 
 ## 使用原则
 
