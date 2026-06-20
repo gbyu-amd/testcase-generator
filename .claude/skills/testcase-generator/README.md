@@ -16,7 +16,7 @@ testcase-generator/
 │   ├── common_templates/ # 通用格式模板
 │   └── modules/          # CPV 菜单参考用例
 │       ├── menu_index.md # 菜单路径到参考文件的索引
-│       └── <site_type>/<level1_menu>/<level2_menu>.md
+│       └── <site_type>/<level1_menu>/<level2_menu>.md 或 <level2_menu>_<requirement_or_submodule>.md
 ├── inputs/               # 输入层：本次生成的素材
 │   ├── requirements/     # 需求文档
 │   │   ├── raw_docs/     # 原始 Word 文档（.docx）
@@ -42,11 +42,12 @@ testcase-generator/
 ## 工作流程
 
 ```
-用户提供 Word 文件 + 章节名
+用户提供 Word 文件或 current_prd.md + 章节名
        │
        ▼
-① AI 提取章节内容（convert_docx.py --section --print）
-   无需用户手动转换，图片自动忽略
+① AI 提取章节内容
+   - Word：convert_docx.py --section --print，图片自动忽略
+   - Markdown：直接读取 inputs/requirements/current_prd.md 对应章节
        │
        ▼
 ② AI 读取同名 UI 图目录（inputs/ui_design/<章节名>/）
@@ -101,12 +102,13 @@ testcase-generator/
 | 输入类型 | 保存位置 | 说明 |
 |---|---|---|
 | 原始 Word 文档 | `inputs/requirements/raw_docs/` | 产品经理提供的 .docx，AI 自动提取章节内容 |
+| 当前 Markdown PRD | `inputs/requirements/current_prd.md` | 已转换或人工维护的当前 PRD，可直接按章节生成用例 |
 | UI 设计图 | `inputs/ui_design/<章节名>/` | 目录名与 PRD 章节名一致，AI 自动匹配读取 |
 | 历史 PRD 归档 | `inputs/requirements/archive/` | 已处理过的历史版本 |
 
 ### 2. 提出需求
 
-直接在对话中说明 Word 文件和章节名，无需手动执行任何脚本：
+直接在对话中说明 PRD 文件和章节名，无需手动执行任何脚本。可以使用原始 Word，也可以直接使用 `current_prd.md`：
 
 ```
 根据 inputs/requirements/raw_docs/tangyao_prd.docx 的"报告编制"章节生成测试用例
@@ -114,6 +116,14 @@ testcase-generator/
 
 ```
 根据 inputs/requirements/raw_docs/tangyao_prd.docx 的"权限管理"章节追加生成测试用例
+```
+
+```
+根据 inputs/requirements/current_prd.md 的"配对T检验"章节生成测试用例
+```
+
+```
+根据 current_prd.md 的"监控项目"章节补充测试用例
 ```
 
 不确定章节名时，可以先问：
@@ -193,7 +203,7 @@ python scripts/validate_cases.py --source testcase_templates/modules
 
 - **SKILL.md**：Agent 执行规则，包含完整的生成流程和质量要求
 - **README.md**：给使用者看的快速上手说明
-- **testcase_templates/modules/**：按站点分类和一级菜单组织的参考用例库，二级菜单维护为同名 `.md` 文件，只读使用，不保存新生成用例
+- **testcase_templates/modules/**：按站点分类和一级菜单组织的参考用例库，参考文件支持 `<level2_menu>.md` 和 `<level2_menu>_<requirement_or_submodule>.md` 两种命名；二级菜单未拆分时用前者，按需求或子功能拆分时用后者，只读使用，不保存新生成用例
 - **outputs/origin_exports/public_site/**：公共管理站点原始 Markdown 用例保存位置
 - **outputs/origin_exports/business_site/**：业务站点原始 Markdown 用例保存位置
 - **outputs/excel_exports/public_site/**：公共管理站点 Excel 导出文件保存位置
@@ -219,8 +229,9 @@ python scripts/validate_cases.py --source testcase_templates/modules
 | 业务站点 | 方案模板 | `testcase_templates/modules/business_site/scheme_manage/scheme_templates.md` |
 | 业务站点 | 方案编制 | `testcase_templates/modules/business_site/scheme_manage/scheme_formulation.md` |
 | 业务站点 | 关联分析 | `testcase_templates/modules/business_site/scheme_execution/correlation_analysis.md` |
-| 业务站点 | 监控项目 | `testcase_templates/modules/business_site/scheme_execution/monitoring_items.md` |
+| 业务站点 | 监控项目 / 箱线图 | `testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot.md` |
+| 业务站点 | 监控项目 / 配对T检验 | `testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t.md` |
 | 业务站点 | 报告生成 | `testcase_templates/modules/business_site/report_manage/report_generation.md` |
 | 业务站点 | 报告模板 | `testcase_templates/modules/business_site/report_manage/report_templates.md` |
 
-参考文件路径以 `testcase_templates/modules/menu_index.md` 为准。`public_site/` 和 `business_site/` 下只维护一级菜单目录；一级菜单下的二级菜单用 `<level2_menu>.md` 文件维护。目录名和文件名必须全部小写，不带空格，以 `_` 分隔单词。
+参考文件路径以 `testcase_templates/modules/menu_index.md` 为准。`public_site/` 和 `business_site/` 下只维护一级菜单目录；一级菜单下的参考文件支持 `<level2_menu>.md` 和 `<level2_menu>_<requirement_or_submodule>.md` 两种命名。二级菜单未拆分或本身已足够精确时用 `<level2_menu>.md`，同一二级菜单下按需求或子功能拆分时用 `<level2_menu>_<requirement_or_submodule>.md`。目录名和文件名必须全部小写，不带空格，以 `_` 分隔单词。

@@ -51,9 +51,9 @@ ls inputs/ui_design/
 **模块参考用例读取规则：**
 
 - `testcase_templates/modules/` 按站点分类和一级菜单组织，`public_site/`、`business_site/` 下只维护一级菜单目录，目录名必须使用小写英文 snake_case。
-- 二级菜单参考用例不再建子目录，统一维护为一级菜单目录下的 `<level2_menu>.md` 文件，例如 `testcase_templates/modules/business_site/report_manage/report_generation.md`。
+- 参考用例维护在一级菜单目录下，同时支持 `<level2_menu>.md` 和 `<level2_menu>_<requirement_or_submodule>.md` 两种命名；二级菜单未拆分或本身已足够精确时使用 `<level2_menu>.md`，例如 `testcase_templates/modules/business_site/scheme_execution/correlation_analysis.md`；同一二级菜单下按需求或子功能拆分时使用 `<level2_menu>_<requirement_or_submodule>.md`，例如 `testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot.md`。
 - 生成前必须先读取 `testcase_templates/modules/menu_index.md`，按 CPV 菜单路径精确匹配参考文件。
-- 若需求明确对应二级菜单，仅读取索引命中的二级菜单 `.md` 参考文件。
+- 若需求明确对应二级菜单、需求名称或子功能模块，仅读取索引命中的 `.md` 参考文件。
 - 若需求只对应一级菜单，或索引未命中二级菜单，则读取该一级菜单目录下最相关的 `.md` 参考文件；仍无法确定时记录缺失参考资料和生成假设。
 - 若同一需求跨多个二级菜单，应读取所有相关 `.md` 参考文件；参考用例只读，不得修改。
 - 参考用例用于对齐写法风格，模板中有对应表述的应原样沿用；模板中没有对应场景的，可自行发挥。
@@ -149,7 +149,7 @@ ls inputs/ui_design/
 
 - 每条 PRD 需求点至少对应一条用例，核心链路需求应有 P0 用例覆盖。
 - 未覆盖的需求点必须显式列出并说明原因（如资料缺失、需求暂缓）。
-- 参考菜单索引命中的 `testcase_templates/modules/<site_type>/<level1_menu>/<level2_menu>.md` 末尾的"覆盖的验收标准"表作为格式范例。
+- 参考菜单索引命中的 `testcase_templates/modules/<site_type>/<level1_menu>/<level2_menu>.md` 或 `testcase_templates/modules/<site_type>/<level1_menu>/<level2_menu>_<requirement_or_submodule>.md` 末尾的"覆盖的验收标准"表作为格式范例；具体以索引中的实际路径为准。
 
 ### 输出文件元信息
 
@@ -292,7 +292,7 @@ python scripts/export_testcases.py --source outputs/origin_exports/<site_type>/<
 - 预期结果必须可验证，包含页面反馈、数据状态或业务状态
 - CPV 核心业务链路必须覆盖状态流转、权限控制、审批/生效、数据完整性、异常拦截、审计追踪和跨模块联动
 - 优先级只能使用 P0、P1、P2
-- 用例描述建议使用：正例、反例、边界、权限、兼容、回归、联动
+- 用例描述建议使用：正例、反例、边界、权限、UI、兼容、回归、联动
 - `用例标签` 必须包含按 `generation_rules/difficulty_level_rules.md` 判定的难度等级：`简单`、`一般` 或 `困难`
 - 新生成用例的 `备注` 必须写明具体来源，例如需求文档、UI 设计图、核心流程或具体规则文件
 - 新生成用例的 `是否自动化`、`关联接口`、`用例测试类`、`关联项目` 字段必须留空
