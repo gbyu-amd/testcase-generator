@@ -22,27 +22,31 @@
 
 ## 输出路径与模块命名规则
 
-| 推荐二级分组 | 适用范围 | 输出路径示例 |
-|---|---|---|
-| 登录与站点 | 登录、站点下拉、公共管理 / 自定义站点跳转、统一认证、会话失效 | `public_site/login_site_testcases.md` |
-| 公共管理 | 统一门户、站点管理、用户管理、权限管理、系统服务管理 | `public_site/public_site_testcases.md` |
-| 产品与基础数据 | 产品、工艺路线、CPP、CQA、CMA、IPC、基础字典、导入导出 | `business_site/product_master_data_testcases.md` |
-| 年度计划与任务 | 年度计划、周期性任务、任务日历、任务进度、任务关闭 | `business_site/annual_plan_task_testcases.md` |
-| 方案编制 | 方案模板、方案创建、提交、审批、退回、生效、升版 | `business_site/protocol_testcases.md` |
-| 监控项目 | 监控项目生成、状态流转、分析前置、结果确认、重新分析 | `business_site/monitoring_item_testcases.md` |
-| 数据分析 | 文件上传校验、插件状态、算法配置、图表配置、结果保存 / 回传 | `business_site/data_analysis_testcases.md` |
-| 一键分析 | 替换数据源、字段匹配、处理规则同步、批量分析、未分析原因 | `business_site/one_click_analysis_testcases.md` |
-| 报告编制 | 报告模板、报告创建、结果引用、审批、生效、导出、任务回推 | `business_site/report_testcases.md` |
-| 审计与电子签名 | 审计追踪、电子签名、操作前后值、失败原因、合规追溯 | 按所属站点选择 `public_site/audit_esignature_testcases.md` 或 `business_site/audit_esignature_testcases.md` |
-| 系统配置与异步任务 | 工作流配置、异步任务、导入导出、失败重试 | 按所属站点选择 `public_site/system_config_async_task_testcases.md` 或 `business_site/system_config_async_task_testcases.md` |
+输出路径固定为：`outputs/origin_exports/<site_type>/<module_name>_testcases.md`。
 
 确定输出文件时：
 
-1. 确定站点分类：`public_site` 或 `business_site`。
-2. 确定中文分组：一级分组、二级分组、三级分组。
-3. 确定输出文件名：`outputs/origin_exports/<site_type>/<module_name>_testcases.md`。
-4. 同一个输出文件内，分组字段和需求覆盖率对照表中的模块引用必须保持一致。
-5. 不修改 `testcase_templates/modules/` 目录。
+1. 先读取本次指定 PRD 章节。若 PRD 明确写出菜单入口、一级菜单、二级菜单或模块名称，以 PRD 原文为业务归属的第一依据。
+2. 按下表确定默认 `<site_type>/<module_name>`；若需求已明确到具体分析方法或子功能，可在默认模块名后追加稳定英文子名，避免落到过宽的通用文件。
+3. 同一个输出文件内，分组字段和需求覆盖率对照表中的模块引用必须保持一致。
+4. 不修改 `testcase_templates/modules/` 目录。
+
+| PRD 归属 / 需求类型 | 默认输出文件 |
+|---|---|
+| 登录、站点下拉、公共管理 / 自定义站点跳转、统一认证、会话失效 | `public_site/login_site_testcases.md` |
+| 统一门户、站点管理、用户管理、权限管理、系统服务管理 | `public_site/public_site_testcases.md` |
+| 产品、工艺路线、CPP、CQA、CMA、IPC、基础字典、导入导出 | `business_site/product_master_data_testcases.md` |
+| 年度计划、周期性任务、任务日历、任务进度、任务关闭 | `business_site/annual_plan_task_testcases.md` |
+| 方案模板、方案创建、提交、审批、退回、生效、升版 | `business_site/protocol_testcases.md` |
+| 监控项目生成、状态流转、分析前置、结果确认、重新分析 | `business_site/monitoring_item_testcases.md` |
+| 方案执行 / 工艺能力汇总 | `business_site/process_capability_summary_testcases.md` |
+| 数据分析通用能力、文件上传校验、插件状态、算法配置、图表配置、结果保存 / 回传 | `business_site/data_analysis_testcases.md` |
+| 一键分析、替换数据源、字段匹配、处理规则同步、批量分析、未分析原因 | `business_site/one_click_analysis_testcases.md` |
+| 报告模板、报告创建、结果引用、审批、生效、导出、任务回推 | `business_site/report_testcases.md` |
+| 审计追踪、电子签名、操作前后值、失败原因、合规追溯 | 按所属站点选择 `public_site/audit_esignature_testcases.md` 或 `business_site/audit_esignature_testcases.md` |
+| 工作流配置、异步任务、导入导出、失败重试 | 按所属站点选择 `public_site/system_config_async_task_testcases.md` 或 `business_site/system_config_async_task_testcases.md` |
+
+命名只保留通用原则：具体分析方法或子功能可拆成更细文件；`<module_name>` 和追加子名必须使用小写英文 snake_case，不带空格；PRD 未明确菜单路径且本表无命中时，按最接近的业务域命名，并在元信息块中记录“缺失明确菜单路径”的生成假设。
 
 ---
 
@@ -75,8 +79,7 @@
 
 - 追加用例必须使用与现有文件完全一致的标准表头。
 - 同一分组下 `用例名称` 不允许重复。
-- 新增用例的 `备注` 必须记录具体来源，可填写需求文档、UI 设计图、用例模板、核心流程或具体规则文件。
-- 来源于参考用例模板时，写为 `来源：xxx用例模板`；来源于流程文件时，写为 `来源：xxx核心流程`，例如 `来源：监控项目用例模板`、`来源：数据分析核心流程`、`来源：一键分析核心流程`。
+- 新增用例的 `备注` 必须按 `generation_rules/testcase_writing_guidelines.md` 的“备注、标签和关联字段”记录具体来源。
 - 新增用例的 `是否自动化`、`关联接口`、`用例测试类`、`关联项目` 字段必须留空。
 - 追加前必须扫描已有文件，不能凭记忆或猜测已有场景。
 
@@ -136,17 +139,6 @@
 
 ## 备注和标签记录
 
-每条新增用例必须在 `备注` 中记录输入来源，便于追溯：
-
-| 推荐记录 | 使用场景 |
-|---|---|
-| 备注：来源：需求文档 | 来自本次输入的 PRD 功能需求或验收标准 |
-| 备注：来源：UI设计图 | 来自 UI 截图、原型图或交互说明 |
-| 备注：来源：data_analysis_flow.md | 来自 `knowledge_base/core_flows/` 下的核心业务流程 |
-| 备注：来源：coverage_dimension_rules.md-合规追溯 | 来自覆盖维度规则中的具体维度 |
-| 备注：来源：priority_rules.md-P0 | 来自优先级规则中的高风险判定 |
-| 备注：来源：需求文档、UI设计图、data_analysis_flow.md | 同一用例同时参考多个来源 |
-
-`备注` 来源必须可追溯，不允许为空，不允许只写"通用""综合""业务规则"或"核心流程"。如来源是流程或规则，必须写到具体文件或具体规则名称。
+每条新增用例必须在 `备注` 中记录输入来源，具体写法以 `generation_rules/testcase_writing_guidelines.md` 的“备注、标签和关联字段”为准，本文件不重复维护来源枚举。
 
 `用例标签` 只填写按 `difficulty_level_rules.md` 判定的难度等级。难度等级只能为 `简单`、`一般`、`困难`，不再保留业务筛选标签。

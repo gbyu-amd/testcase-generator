@@ -88,7 +88,27 @@ MIN_EXPECTATION_LENGTH = 10
 
 INVALID_SOURCE_REMARKS = {"", "无", "待填", "来源：待填"}
 INVALID_SOURCE_ATTRIBUTION_PATTERNS = [
-    re.compile(r"来源：[^；;\n]*?(?:未明确|需要确认|需确认|待确认)")
+    (
+        re.compile(r"来源：[^；;\n]*?(?:未明确|需要确认|需确认|待确认)"),
+        "备注中的“来源：”后只能填写真实来源，不能填写“未明确/需确认”等说明；"
+        "请改为“来源：<规则或资料>；说明：需求文档未明确需要确认”",
+    ),
+    (
+        re.compile(r"来源：[^；;\n]*?需求文档"),
+        "PRD 来源备注必须写为“来源：prd”，不得写为“来源：需求文档”",
+    ),
+    (
+        re.compile(r"来源：[^；;\n]*?UI设计图"),
+        "UI 图来源备注必须写为“来源：UI图”，不得写为“来源：UI设计图”",
+    ),
+    (
+        re.compile(r"来源：[^；;\n]*?核心流程"),
+        "核心流程来源必须写具体 .md 文件名，例如“来源：data_analysis_flow.md”，不得写为“来源：数据分析核心流程”",
+    ),
+    (
+        re.compile(r"来源：[^；;\n]*?用例模板"),
+        "用例模板来源必须写具体 .md 文件名，例如“来源：monitoring_items_paired_t.md”，不得写为“来源：监控项目用例模板”",
+    ),
 ]
 EMPTY_GENERATED_HEADERS = ["是否自动化", "关联接口", "用例测试类", "关联项目"]
 
@@ -357,12 +377,9 @@ def has_valid_source_remark(value: str) -> bool:
 
 def invalid_source_attribution_reason(value: str) -> str:
     normalized = value.strip()
-    for pattern in INVALID_SOURCE_ATTRIBUTION_PATTERNS:
+    for pattern, message in INVALID_SOURCE_ATTRIBUTION_PATTERNS:
         if pattern.search(normalized):
-            return (
-                "备注中的“来源：”后只能填写真实来源，不能填写“未明确/需确认”等说明；"
-                "请改为“来源：<规则或资料>；说明：需求文档未明确需要确认”"
-            )
+            return message
     return ""
 
 
@@ -412,7 +429,7 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     case,
                     "ERROR",
                     "missing_source_remark",
-                    "生成用例的备注必须写明来源，例如 来源：需求文档、来源：UI设计图、来源：data_analysis_flow.md 或 来源：coverage_dimension_rules.md-合规追溯",
+                    "生成用例的备注必须写明来源，例如 来源：prd、来源：UI图、来源：data_analysis_flow.md 或 来源：coverage_dimension_rules.md-合规追溯",
                     "备注",
                 )
             )
