@@ -1,16 +1,16 @@
 # generation_rules 读取说明
 
-`generation_rules` 用于维护测试用例生成规范，负责回答“测试用例应该怎么写”。生成测试用例时，应固定读取本目录下的全部核心规则文件，确保生成口径稳定一致。
+`generation_rules` 用于维护测试用例生成规范，负责回答“测试用例如何流转、应该怎么写、如何校验导出”。生成测试用例时，应固定读取本目录下的全部核心规则文件，确保生成口径稳定一致。
 
 ## 读取原则
 
-- 每次生成测试用例前固定读取：`case_append_rules.md`、`testcase_writing_guidelines.md`、`coverage_dimension_rules.md`、`priority_rules.md`、`difficulty_level_rules.md`。
-- 各规则分别覆盖追加去重与输出路径、写法质量、覆盖维度、优先级和难度判定。
+- 每次生成测试用例前固定读取：`workflow_rules.md`、`case_append_rules.md`、`testcase_writing_guidelines.md`、`coverage_dimension_rules.md`、`priority_rules.md`、`difficulty_level_rules.md`。
+- 各规则分别覆盖执行流程、追加去重与输出路径、写法质量、覆盖维度、优先级和难度判定。
 - `README.MD` 仅作为目录说明，不属于生成前必读规则。
 
 ## 使用方式
 
-- 生成前先完整读取核心规则文件，再根据当前需求提取其中适用的字段、覆盖、优先级、难度和追加去重要求。
+- 生成前先完整读取核心规则文件，再根据当前需求提取其中适用的输入处理、字段、覆盖、优先级、难度、追加去重和导出要求。
 - 不因需求简单而跳过详细规则文件；简单需求也应按同一套质量口径生成。
 - 规则文件只约束测试用例写法，不承载具体业务流程事实。
 
@@ -21,3 +21,4 @@
 - `priority_rules.md`：优先级判定规则。
 - `difficulty_level_rules.md`：用例难度等级判定规则。
 - `case_append_rules.md`：已有用例追加、覆盖、另存和去重规则。
+- `workflow_rules.md`：输入资料处理、站点分类、元信息、需求覆盖率、校验和导出闭环。
