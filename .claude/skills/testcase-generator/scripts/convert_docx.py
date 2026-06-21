@@ -31,7 +31,13 @@ except ImportError:
         "缺少依赖：请先运行 pip install python-docx"
     )
 
-from case_utils import build_source_path, configure_output_encoding, ensure_under, project_root
+from case_utils import (
+    build_source_path,
+    configure_output_encoding,
+    ensure_under,
+    project_root,
+    write_text_file,
+)
 
 
 # Word 内置标题样式名（包含中文本地化名称）
@@ -382,7 +388,7 @@ def main() -> int:
             return 0
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(content, encoding="utf-8")
+    write_text_file(output_path, content, encoding="utf-8")
 
     line_count = content.count("\n")
     print(f"转换完成：")

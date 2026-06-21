@@ -38,6 +38,7 @@ outputs/origin_exports/<site_type>/<module_name>_testcases.md
 
 - `<module_name>` 和追加子名必须使用小写英文 snake_case，不带空格。
 - 具体分析方法或子功能可拆成更细文件，例如 `data_analysis_paired_t_testcases.md`、`data_analysis_p_control_chart_testcases.md`。
+- 模板文件名和输出文件名不要求一一对应：模板按菜单或参考场景命名并统一以 `_template.md` 结尾；输出文件按需求或子功能命名并统一以 `_testcases.md` 结尾。
 - PRD 未明确菜单路径且上表无命中时，按最接近的业务域命名，并在元信息块中记录“缺失明确菜单路径”的生成假设。
 
 ---
@@ -67,9 +68,9 @@ outputs/origin_exports/<site_type>/<module_name>_testcases.md
 ## 参考模板匹配
 
 - 生成前读取 `testcase_templates/modules/menu_index.md`，按 CPV 菜单路径匹配参考文件。
-- 读取索引命中的 `testcase_templates/modules/<site_type>/<level1_menu>/<level2_menu>.md` 或 `testcase_templates/modules/<site_type>/<level1_menu>/<level2_menu>_<requirement_or_submodule>.md`；具体以索引中的实际路径为准。
-- 若索引未命中，再读取该一级菜单目录下最相关的 `.md` 参考文件。
-- 新需求跨多个二级菜单时，读取所有相关 `.md` 参考文件，用于去重和补充场景判断。
+- 读取索引命中的 `testcase_templates/modules/<site_type>/<level1_menu>/<level2_menu>_template.md` 或 `testcase_templates/modules/<site_type>/<level1_menu>/<level2_menu>_<requirement_or_submodule>_template.md`；具体以索引中的实际路径为准。
+- 若索引未命中，再读取该一级菜单目录下最相关的 `*_template.md` 参考文件。
+- 新需求跨多个二级菜单时，读取所有相关 `*_template.md` 参考文件，用于去重和补充场景判断。
 - 找不到对应菜单参考文件时，不阻塞生成，应记录缺失参考资料和生成假设。
 - 参考模板只用于用例风格、分组、覆盖思路和去重判断，不作为业务归属依据；业务归属以 PRD 和“输出文件定位”为准。
 - 参考模板只读，不修改 `testcase_templates/modules/`。

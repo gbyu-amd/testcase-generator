@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import html
+import os
 import re
 import sys
 from pathlib import Path
@@ -84,6 +85,24 @@ def build_source_path(source_arg: str, root: Path) -> Path:
     if not source_path.is_absolute():
         source_path = root / source_path
     return source_path
+
+
+def windows_long_path(path: Path) -> str:
+    """Return a filesystem path that works with long Windows paths."""
+    resolved = str(path.resolve())
+    if os.name != "nt" or resolved.startswith("\\\\?\\"):
+        return resolved
+    return "\\\\?\\" + resolved
+
+
+def read_text_file(path: Path, encoding: str = "utf-8") -> str:
+    with open(windows_long_path(path), encoding=encoding) as file:
+        return file.read()
+
+
+def write_text_file(path: Path, content: str, encoding: str = "utf-8") -> None:
+    with open(windows_long_path(path), "w", encoding=encoding) as file:
+        file.write(content)
 
 
 def split_markdown_row(line: str) -> list[str]:
@@ -316,9 +335,9 @@ def parse_case_file(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     cases: list[dict[str, str]] = []
 
     try:
-        lines = path.read_text(encoding="utf-8-sig").splitlines()
+        lines = read_text_file(path, encoding="utf-8-sig").splitlines()
     except UnicodeDecodeError:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        lines = read_text_file(path, encoding="utf-8").splitlines()
 
     index = 0
     found_table = False
@@ -380,6 +399,7 @@ def discover_case_files(source: Path) -> list[Path]:
                 path
                 for path in source.rglob("*.md")
                 if path.name not in skipped_names
+                and path.name.endswith("_template.md")
             )
 
         # 仅匹配以 _testcases.md 结尾的文件，带时间戳的"另存"文件

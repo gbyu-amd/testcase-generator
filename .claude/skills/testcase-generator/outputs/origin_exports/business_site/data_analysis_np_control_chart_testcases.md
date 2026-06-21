@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 生成时间：2026-06-20 22:50
 操作类型：新建
 来源文档：inputs/requirements/current_prd.md
@@ -7,8 +7,8 @@
   - inputs/requirements/current_prd.md（最后修改：未知）
   - inputs/ui_design/NP控制图/config.png（最后修改：未知）
   - inputs/ui_design/NP控制图/result.png（最后修改：未知）
-  - testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot.md（最后修改：未知）
-  - testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t.md（最后修改：未知）
+  - testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot_template.md（最后修改：未知）
+  - testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t_template.md（最后修改：未知）
   - knowledge_base/core_flows/data_analysis_flow.md（最后修改：未知）
   - knowledge_base/core_flows/one_click_analysis_flow.md（最后修改：未知）
 生成假设：

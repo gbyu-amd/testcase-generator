@@ -1,4 +1,4 @@
-# 用例编写规范
+﻿# 用例编写规范
 
 ## 基本原则
 
@@ -131,10 +131,10 @@
 - 新生成或追加的用例，`备注` 必须填写来源，不允许为空或填写 `无`。
 - 来自需求文档、PRD、验收标准或用户补充需求的用例，统一填写 `来源：prd`。
 - 来自 UI 设计图、截图、原型图或界面交互说明的用例，填写 `来源：UI图`。
-- 来自参考用例模板的用例，必须写清具体模板文件名，格式为 `来源：xxx.md`，例如 `来源：monitoring_items_paired_t.md`、`来源：report_generation.md`。
+- 来自参考用例模板的用例，必须写清具体模板文件名，格式为 `来源：xxx.md`，例如 `来源：monitoring_items_paired_t_template.md`、`来源：report_generation_template.md`。
 - 来自核心流程文件的用例，必须写清具体 `.md` 文件名，例如 `来源：data_analysis_flow.md`、`来源：one_click_analysis_flow.md`、`来源：cpv_business_flow.md`，不得写成中文“xxx核心流程”。
 - 来自业务规则、覆盖维度规则、优先级规则或具体知识库文件的用例，必须写清具体来源，例如 `来源：coverage_dimension_rules.md-合规追溯`、`来源：priority_rules.md-P0`。
-- 同一条用例参考多个来源时，用顿号分隔，例如 `来源：prd、UI图、monitoring_items_paired_t.md、data_analysis_flow.md`。
+- 同一条用例参考多个来源时，用顿号分隔，例如 `来源：prd、UI图、monitoring_items_paired_t_template.md、data_analysis_flow.md`。
 - 生成假设或评审说明不写入 `备注`，可写入文件元信息块或需求覆盖率对照表。
 - `用例标签` 只填写按 `difficulty_level_rules.md` 判定的难度等级，取值只能为 `简单`、`一般`、`困难`。
 - 不再写入业务筛选标签、优先级标签或模块标签，避免与当前标准表头和校验口径冲突。

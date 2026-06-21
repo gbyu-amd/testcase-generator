@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 用途：
@@ -60,8 +60,10 @@ from case_utils import (
     normalize_cell,
     parse_case_file,
     project_root,
+    read_text_file,
     split_case_tags,
     split_markdown_row,
+    write_text_file,
 )
 
 
@@ -107,7 +109,7 @@ INVALID_SOURCE_ATTRIBUTION_PATTERNS = [
     ),
     (
         re.compile(r"来源：[^；;\n]*?用例模板"),
-        "用例模板来源必须写具体 .md 文件名，例如“来源：monitoring_items_paired_t.md”，不得写为“来源：监控项目用例模板”",
+        "用例模板来源必须写具体 .md 文件名，例如“来源：monitoring_items_paired_t_template.md”，不得写为“来源：监控项目用例模板”",
     ),
 ]
 EMPTY_GENERATED_HEADERS = ["是否自动化", "关联接口", "用例测试类", "关联项目"]
@@ -252,7 +254,7 @@ def markdown_separator() -> str:
 
 def fix_case_file(path: Path) -> dict[str, object]:
     # 统一以无 BOM 的 utf-8 读写，去除 BOM 是有意为之，保证后续处理的一致性。
-    original_text = path.read_text(encoding="utf-8-sig")
+    original_text = read_text_file(path, encoding="utf-8-sig")
     lines = original_text.splitlines()
     updated_lines: list[str] = []
     changed_rows = 0
@@ -319,7 +321,7 @@ def fix_case_file(path: Path) -> dict[str, object]:
     updated_text = "\n".join(compact_lines).rstrip() + "\n"
     changed = updated_text != original_text
     if changed:
-        path.write_text(updated_text, encoding="utf-8")
+        write_text_file(path, updated_text, encoding="utf-8")
 
     return {
         "file": str(path),

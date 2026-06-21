@@ -24,7 +24,7 @@
 示例：
     python scripts/export_testcases.py
     python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md
-    python scripts/export_testcases.py --strict -o data_analysis_testcases.xlsx
+    python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md --strict -o data_analysis_testcases.xlsx
 
 本脚本只使用 Python 标准库，不需要额外安装依赖。
 """
@@ -48,6 +48,7 @@ from case_utils import (
     ensure_under,
     parse_case_file,
     project_root,
+    windows_long_path,
 )
 from validate_cases import (
     format_issue,
@@ -218,7 +219,9 @@ def write_xlsx(output_path: Path, cases: list[dict[str, str]]) -> None:
     }
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with zipfile.ZipFile(output_path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+    with zipfile.ZipFile(
+        windows_long_path(output_path), "w", compression=zipfile.ZIP_DEFLATED
+    ) as archive:
         for archive_path, content in files.items():
             archive.writestr(archive_path, content)
 
@@ -265,8 +268,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "-o",
         "--output",
         help=(
-            "输出文件名或路径。相对路径会保存到 outputs/excel_exports/；"
-            "未指定时按 source 所属站点分类输出"
+            "输出文件名或路径，仅支持 --source 指向单个 Markdown 文件时使用；"
+            "相对路径会保存到 source 所属站点的 outputs/excel_exports/<site_type>/"
         ),
     )
     parser.add_argument(
@@ -277,7 +280,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument(
         "--clean",
         action="store_true",
-        help="导出成功后清理本次输出目录下的历史 xlsx，仅保留本次导出文件",
+        help="导出成功后仅清理本次输出目录下的临时汇总 Excel：测试用例导出_*.xlsx",
     )
     return parser.parse_args(argv)
 
@@ -285,11 +288,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 def clean_old_exports(output_dir: Path, keep: Path) -> list[Path]:
     keep = keep.resolve()
     removed: list[Path] = []
-    for existing in output_dir.glob("*.xlsx"):
+    for existing in output_dir.glob("测试用例导出_*.xlsx"):
         if existing.resolve() == keep:
             continue
         try:
-            existing.unlink()
+            Path(windows_long_path(existing)).unlink()
             removed.append(existing)
         except OSError as exc:
             # 文件可能被 Excel 等进程占用，跳过并提示，不中断导出流程
@@ -297,13 +300,19 @@ def clean_old_exports(output_dir: Path, keep: Path) -> list[Path]:
     return removed
 
 
-def build_output_path(output_arg: str | None, output_dir: Path) -> Path:
+def build_output_path(
+    output_arg: str | None, output_dir: Path, site_type: str | None = None
+) -> Path:
     if not output_arg:
         return default_output_path(output_dir)
 
     output_path = Path(output_arg)
     if not output_path.is_absolute():
-        output_path = output_dir / output_path
+        if output_path.parts and output_path.parts[0] in SITE_TYPES:
+            output_path = output_dir / output_path
+        else:
+            site_output_dir = output_dir / site_type if site_type else output_dir
+            output_path = site_output_dir / output_path
     if output_path.suffix.lower() != ".xlsx":
         output_path = output_path.with_suffix(".xlsx")
     return output_path
@@ -329,14 +338,24 @@ def main(argv: list[str]) -> int:
 
     groups = group_case_files_by_site(case_files, origin_dir)
     if args.output:
+        if len(case_files) != 1:
+            print(
+                "导出失败：指定 -o/--output 时，--source 必须指向单个 Markdown 用例文件；"
+                "批量或目录导出请不要使用 -o。",
+                file=sys.stderr,
+            )
+            return 1
+        site_type = site_type_for_case_file(case_files[0], origin_dir)
         try:
             output_path = ensure_under(
-                build_output_path(args.output, output_dir), output_dir, "输出路径"
+                build_output_path(args.output, output_dir, site_type),
+                output_dir,
+                "输出路径",
             )
         except ValueError as error:
             print(f"导出失败：{error}", file=sys.stderr)
             return 1
-        export_groups = [("all", case_files, output_path)]
+        export_groups = [(site_type or "未分类", case_files, output_path)]
     else:
         export_groups = []
         for site_type, files in sorted(groups.items(), key=lambda item: item[0] or ""):

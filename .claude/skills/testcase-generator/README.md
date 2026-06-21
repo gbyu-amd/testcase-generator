@@ -1,4 +1,4 @@
-# CPV 测试用例生成器
+﻿# CPV 测试用例生成器
 
 ## 项目是什么
 
@@ -16,7 +16,7 @@ testcase-generator/
 │   ├── common_templates/ # 通用格式模板
 │   └── modules/          # CPV 菜单参考用例
 │       ├── menu_index.md # 菜单路径到参考文件的索引
-│       └── <site_type>/<level1_menu>/<level2_menu>.md 或 <level2_menu>_<requirement_or_submodule>.md
+│       └── <site_type>/<level1_menu>/<level2_menu>_template.md 或 <level2_menu>_<requirement_or_submodule>_template.md
 ├── inputs/               # 输入层：本次生成的素材
 │   ├── requirements/     # 需求文档
 │   │   ├── raw_docs/     # 原始 Word 文档（.docx）
@@ -205,7 +205,7 @@ python scripts/validate_cases.py --source testcase_templates/modules
 
 - **SKILL.md**：Agent 执行规则，包含完整的生成流程和质量要求
 - **README.md**：给使用者看的快速上手说明
-- **testcase_templates/modules/**：按站点分类和一级菜单组织的参考用例库，参考文件支持 `<level2_menu>.md` 和 `<level2_menu>_<requirement_or_submodule>.md` 两种命名；二级菜单未拆分时用前者，按需求或子功能拆分时用后者，只读使用，不保存新生成用例
+- **testcase_templates/modules/**：按站点分类和一级菜单组织的参考用例库，参考文件统一以 `_template.md` 作为公共后缀；二级菜单未拆分时用 `<level2_menu>_template.md`，按需求或子功能拆分时用 `<level2_menu>_<requirement_or_submodule>_template.md`，只读使用，不保存新生成用例
 - **outputs/origin_exports/public_site/**：公共管理站点原始 Markdown 用例保存位置
 - **outputs/origin_exports/business_site/**：业务站点原始 Markdown 用例保存位置
 - **outputs/excel_exports/public_site/**：公共管理站点 Excel 导出文件保存位置
@@ -222,18 +222,4 @@ python scripts/validate_cases.py --source testcase_templates/modules
 
 ## 参考模块路径
 
-| 一级菜单 | 二级菜单 | 文件路径示例 |
-|---|---|---|
-| 公共管理站点 | 审计追踪 / 权限管理 | `testcase_templates/modules/public_site/audit_trail/audit_trail_permission_manage.md` |
-| 业务站点 | 配置管理 / 审计追踪 | `testcase_templates/modules/business_site/configuration_manage/audit_trail.md` |
-| 业务站点 | 年度计划设置 | `testcase_templates/modules/business_site/plan_manage/annual_plan_settings.md` |
-| 业务站点 | 任务管理 | `testcase_templates/modules/business_site/plan_manage/task_manage.md` |
-| 业务站点 | 方案模板 | `testcase_templates/modules/business_site/scheme_manage/scheme_templates.md` |
-| 业务站点 | 方案编制 | `testcase_templates/modules/business_site/scheme_manage/scheme_formulation.md` |
-| 业务站点 | 关联分析 | `testcase_templates/modules/business_site/scheme_execution/correlation_analysis.md` |
-| 业务站点 | 监控项目 / 箱线图 | `testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot.md` |
-| 业务站点 | 监控项目 / 配对T检验 | `testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t.md` |
-| 业务站点 | 报告生成 | `testcase_templates/modules/business_site/report_manage/report_generation.md` |
-| 业务站点 | 报告模板 | `testcase_templates/modules/business_site/report_manage/report_templates.md` |
-
-参考文件路径以 `testcase_templates/modules/menu_index.md` 为准。`public_site/` 和 `business_site/` 下只维护一级菜单目录；一级菜单下的参考文件支持 `<level2_menu>.md` 和 `<level2_menu>_<requirement_or_submodule>.md` 两种命名。二级菜单未拆分或本身已足够精确时用 `<level2_menu>.md`，同一二级菜单下按需求或子功能拆分时用 `<level2_menu>_<requirement_or_submodule>.md`。目录名和文件名必须全部小写，不带空格，以 `_` 分隔单词。
+参考文件路径以 `testcase_templates/modules/menu_index.md` 为准，根 README 不再重复维护完整索引表。`public_site/` 和 `business_site/` 下只维护一级菜单目录；一级菜单下的参考文件统一以 `_template.md` 作为公共后缀。二级菜单未拆分或本身已足够精确时用 `<level2_menu>_template.md`，同一二级菜单下按需求或子功能拆分时用 `<level2_menu>_<requirement_or_submodule>_template.md`。目录名和文件名必须全部小写，不带空格，以 `_` 分隔单词。

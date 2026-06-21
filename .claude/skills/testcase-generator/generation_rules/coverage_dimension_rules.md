@@ -1,4 +1,4 @@
-# 覆盖维度规则
+﻿# 覆盖维度规则
 
 ## 使用原则
 
@@ -39,7 +39,7 @@
 | 登录、站点、菜单权限、按钮权限、产品数据权限 | `knowledge_base/user_roles.md`、`knowledge_base/core_flows/login_flow.md` |
 | 数据分析入口、分析图范围、结果回传 | `knowledge_base/core_flows/data_analysis_flow.md` |
 | 替换数据源与一键分析 | `knowledge_base/core_flows/one_click_analysis_flow.md` |
-| 新增或补充分析图 / 分析方法的默认覆盖 | `knowledge_base/core_flows/data_analysis_flow.md`、`knowledge_base/core_flows/one_click_analysis_flow.md`、`testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot.md`、`testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t.md` |
+| 新增或补充分析图 / 分析方法的默认覆盖 | `knowledge_base/core_flows/data_analysis_flow.md`、`knowledge_base/core_flows/one_click_analysis_flow.md`、`testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot_template.md`、`testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t_template.md` |
 | 具体菜单模块 | `testcase_templates/modules/menu_index.md` 命中的参考用例 |
 
 ---
@@ -127,7 +127,7 @@
 #### 通用能力
 
 - 读取 `knowledge_base/core_flows/one_click_analysis_flow.md`。
-- 参考 `testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot.md`、`testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t.md` 中一键分析相关用例风格。
+- 参考 `testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot_template.md`、`testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t_template.md` 中一键分析相关用例风格。
 - 一键分析默认覆盖五类分组：`数据替换`、`数据处理`、`未分析的图参与一键分析`、`定类变量暂不支持分析`、`其他原因`。
 
 #### 默认覆盖项

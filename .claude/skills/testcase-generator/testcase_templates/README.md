@@ -6,25 +6,25 @@
 
 ## 模块目录结构
 
-`modules/` 按站点分类和 CPV 一级菜单组织，参考文件维护在一级菜单目录下，同时支持 `<level2_menu>.md` 和 `<level2_menu>_<requirement_or_submodule>.md` 两种命名。二级菜单未拆分或本身已足够精确时用 `<level2_menu>.md`，同一二级菜单下按需求或子功能拆分时用 `<level2_menu>_<requirement_or_submodule>.md`。目录名和文件名必须全部小写，不带空格，以 `_` 分隔单词：
+`modules/` 按站点分类和 CPV 一级菜单组织，参考文件维护在一级菜单目录下，统一以 `_template.md` 作为公共后缀。二级菜单未拆分或本身已足够精确时用 `<level2_menu>_template.md`，同一二级菜单下按需求或子功能拆分时用 `<level2_menu>_<requirement_or_submodule>_template.md`。目录名和文件名必须全部小写，不带空格，以 `_` 分隔单词：
 
 ```text
 modules/
 ├── menu_index.md                   # 菜单路径到参考文件的索引
 └── <site_type>/
     └── <level1_menu>/
-        ├── <level2_menu>.md
-        └── <level2_menu>_<requirement_or_submodule>.md
+        ├── <level2_menu>_template.md
+        └── <level2_menu>_<requirement_or_submodule>_template.md
                                       # 二级菜单参考用例，或二级菜单 + 需求名称/子功能模块参考用例
 ```
 
-读取参考用例时，先读取 `modules/menu_index.md`，再按菜单路径命中具体 `.md` 文件；需求跨多个二级菜单时，应读取所有相关文件。
+读取参考用例时，先读取 `modules/menu_index.md`，再按菜单路径命中具体 `*_template.md` 文件；需求跨多个二级菜单时，应读取所有相关模板文件。
 
 ## 读取原则
 
 - 生成测试用例时，不默认全量读取 `testcase_templates/` 下所有模板和参考用例。
 - 优先读取 `modules/menu_index.md`，按菜单路径匹配模块参考用例。
-- 若命中具体模块，只读取索引命中的 `.md` 参考文件。
+- 若命中具体模块，只读取索引命中的 `*_template.md` 参考文件。
 - 若需求跨多个二级菜单，只读取所有相关的模块参考文件。
 - `common_templates/` 仅在需要异常、边界、兼容等通用写法时按用例类型读取。
 - 找不到模块参考文件时，才参考最相关的通用模板，并在生成结果中记录缺失参考资料或生成假设。

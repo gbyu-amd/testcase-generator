@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 生成时间：2026-06-20 23:31
 操作类型：新建
 来源文档：inputs/requirements/current_prd.md
@@ -11,7 +11,7 @@
   - generation_rules/priority_rules.md（最后修改：2026-06-20 00:17:12）
   - generation_rules/difficulty_level_rules.md（最后修改：2026-06-20 00:17:11）
   - testcase_templates/modules/menu_index.md（最后修改：2026-06-20 16:45:02）
-  - testcase_templates/modules/business_site/configuration_manage/audit_trail.md（最后修改：2026-06-19 21:11:36）
+  - testcase_templates/modules/business_site/configuration_manage/audit_trail_template.md（最后修改：2026-06-19 21:11:36）
   - knowledge_base/user_roles.md（最后修改：2026-06-19 16:12:47）
 生成假设：未找到 inputs/ui_design/工艺能力汇总/ 目录，本次按 current_prd.md 原文生成；导出文件名按 PRD 审计追踪受影响对象格式 {方案名称}_{导出监控项目数量}_{时间戳}.pdf 校验。
 -->

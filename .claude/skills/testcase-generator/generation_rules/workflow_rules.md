@@ -78,25 +78,7 @@ Get-ChildItem inputs/ui_design/
 
 ## 输出文件处理
 
-Markdown 源文件固定保存为：
-
-```text
-outputs/origin_exports/<site_type>/<module_name>_testcases.md
-```
-
-生成前必须检查目标文件是否存在：
-
-- 文件不存在：直接新建。
-- 文件存在但为空或没有有效用例表：可覆盖初始化。
-- 文件已存在且包含有效用例：停止生成，等待用户明确选择 `追加`、`覆盖` 或 `另存`。
-
-另存文件使用：
-
-```text
-<module_name>_testcases_YYYYMMDD_HHMMSS.md
-```
-
-带时间戳的另存文件不会被脚本默认扫描；校验或导出时必须用 `--source` 显式指定。
+输出路径、模块命名、追加 / 覆盖 / 另存和去重规则以 `case_append_rules.md` 为唯一来源。本文件只维护输入资料、元信息、覆盖率、校验和导出闭环。
 
 ## 元信息和覆盖率
 

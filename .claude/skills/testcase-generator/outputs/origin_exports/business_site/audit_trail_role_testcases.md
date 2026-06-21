@@ -1,11 +1,11 @@
-<!--
+﻿<!--
 生成时间：2026-06-19 15:00
 操作类型：覆盖
 来源文档：inputs/requirements/raw_docs/tangyao_prd.docx
 来源章节：业务站点的角色管理审计内容优化
 输入文件：
   - inputs/requirements/raw_docs/tangyao_prd.docx（最后修改：未知）
-参考模板：testcase_templates/modules/public_site/audit_trail/audit_trail_permission_manage.md
+参考模板：testcase_templates/modules/public_site/audit_trail/audit_trail_permission_manage_template.md
 生成假设：
   - 审计追踪入口为业务站点 / 配置管理 / 审计追踪，按角色管理模块过滤
   - 详情以弹窗形式展示，分为基本信息和内容详情两部分

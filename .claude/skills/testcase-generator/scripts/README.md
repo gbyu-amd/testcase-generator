@@ -85,13 +85,15 @@ python scripts/export_testcases.py --source outputs/origin_exports/business_site
 python scripts/export_testcases.py -o data_analysis_paired_t_testcases.xlsx --source outputs/origin_exports/business_site/data_analysis_paired_t_testcases.md
 ```
 
+`-o` 仅支持 `--source` 指向单个 Markdown 用例文件时使用。相对文件名会保存到源文件所属站点目录，例如 `outputs/excel_exports/business_site/data_analysis_paired_t_testcases.xlsx`；批量或目录导出请不要使用 `-o`。
+
 ### 导出并清理历史 Excel
 
 ```bash
 python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_paired_t_testcases.md --clean
 ```
 
-`--clean` 只清理本次输出目录下其他 `.xlsx` 文件，使用前需确认不会删除仍需保留的交付文件。
+`--clean` 只清理本次输出目录下的临时汇总 Excel（`测试用例导出_*.xlsx`），不会删除分需求交付文件。
 
 ### 启用严格校验
 
