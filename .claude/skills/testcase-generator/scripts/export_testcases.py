@@ -65,6 +65,7 @@ INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 _STYLE_HEADER = 1    # 表头：加粗、绿色背景、居中
 _STYLE_DATA = 2      # 数据行：带边框、顶部对齐、自动换行
 SITE_TYPES = ("public_site", "business_site")
+GROUP_HEADERS = ("一级分组", "二级分组", "三级分组")
 
 
 def column_name(index: int) -> str:
@@ -98,15 +99,33 @@ def row_xml(row_index: int, values: list[str], style_index: int) -> str:
     return f'<row r="{row_index}" ht="{height}" customHeight="1">{"".join(cells)}</row>'
 
 
+def display_values_for_excel(
+    headers: list[str], case: dict[str, str], previous_groups: tuple[str, str, str] | None
+) -> tuple[list[str], tuple[str, str, str]]:
+    """Blank repeated group names to make the exported sheet easier to scan."""
+    current_groups = tuple(case.get(header, "") for header in GROUP_HEADERS)
+    values: list[str] = []
+
+    for header in headers:
+        value = case[header]
+        if header in GROUP_HEADERS and previous_groups is not None:
+            group_index = GROUP_HEADERS.index(header)
+            if current_groups[: group_index + 1] == previous_groups[: group_index + 1]:
+                value = ""
+        values.append(value)
+
+    return values, current_groups
+
+
 def worksheet_xml(headers: list[str], cases: list[dict[str, str]]) -> str:
     max_row = len(cases) + 1
     max_col = len(headers)
     dimension = f"A1:{column_name(max_col)}{max_row}"
     rows = [row_xml(1, headers, _STYLE_HEADER)]
-    rows.extend(
-        row_xml(row_index, [case[header] for header in headers], _STYLE_DATA)
-        for row_index, case in enumerate(cases, start=2)
-    )
+    previous_groups: tuple[str, str, str] | None = None
+    for row_index, case in enumerate(cases, start=2):
+        values, previous_groups = display_values_for_excel(headers, case, previous_groups)
+        rows.append(row_xml(row_index, values, _STYLE_DATA))
 
     column_widths = [16, 16, 16, 36, 10, 12, 16, 36, 48, 52, 24, 18, 14, 24, 18, 18]
     cols = "".join(
@@ -402,7 +421,14 @@ def main(argv: list[str]) -> int:
             print()
 
         cases = apply_difficulty_tags(cases)
-        write_xlsx(output_path, cases)
+        try:
+            write_xlsx(output_path, cases)
+        except OSError as error:
+            print(
+                f"导出失败：无法写入 {output_path}，请确认文件未被 Excel 打开且目录可写：{error}",
+                file=sys.stderr,
+            )
+            return 1
 
         removed_files: list[Path] = []
         if args.clean:

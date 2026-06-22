@@ -56,6 +56,7 @@ from case_utils import (
     discover_case_files,
     ensure_under,
     infer_case_difficulty,
+    infer_case_difficulty_with_reason,
     is_separator_row,
     normalize_cell,
     parse_case_file,
@@ -465,14 +466,17 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
 
         tags = split_case_tags(case.get("用例标签", ""))
         difficulty_tags = [tag for tag in tags if tag in DIFFICULTY_LEVELS]
-        expected_difficulty = infer_case_difficulty(case)
+        expected_difficulty, difficulty_reasons = infer_case_difficulty_with_reason(case)
+        difficulty_reason_text = (
+            f"；原因：{'；'.join(difficulty_reasons)}" if difficulty_reasons else ""
+        )
         if not difficulty_tags:
             issues.append(
                 case_issue(
                     case,
                     "WARN",
                     "missing_difficulty_tag",
-                    f"用例标签缺少难度等级，按 difficulty_level_rules.md 推断应为：{expected_difficulty}",
+                    f"用例标签缺少难度等级，按 difficulty_level_rules.md 推断应为：{expected_difficulty}{difficulty_reason_text}",
                     "用例标签",
                 )
             )
@@ -482,7 +486,7 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     case,
                     "WARN",
                     "mismatched_difficulty_tag",
-                    f"用例标签中的难度为 {'、'.join(difficulty_tags)}，按 difficulty_level_rules.md 推断应为：{expected_difficulty}",
+                    f"用例标签中的难度为 {'、'.join(difficulty_tags)}，按 difficulty_level_rules.md 推断应为：{expected_difficulty}{difficulty_reason_text}",
                     "用例标签",
                 )
             )
@@ -492,7 +496,7 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     case,
                     "WARN",
                     "multiple_difficulty_tags",
-                    f"用例标签中存在多个难度等级：{'、'.join(difficulty_tags)}，仅应保留 {expected_difficulty}",
+                    f"用例标签中存在多个难度等级：{'、'.join(difficulty_tags)}，仅应保留 {expected_difficulty}{difficulty_reason_text}",
                     "用例标签",
                 )
             )
