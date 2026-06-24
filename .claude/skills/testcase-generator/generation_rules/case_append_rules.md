@@ -6,6 +6,17 @@
 
 ## 输出文件定位
 
+站点分类、输出根目录和默认文件名均在本节维护，其他规则文件只引用本节。
+
+| 站点分类 | `<site_type>` | Markdown 输出根目录 | Excel 输出根目录 | 适用范围 |
+|---|---|---|---|---|
+| 公共管理站点 | `public_site` | `outputs/origin_exports/public_site/` | `outputs/excel_exports/public_site/` | 统一门户、站点管理、全局用户、权限管理、系统服务管理、公共管理审计、登录日志 |
+| 业务站点 | `business_site` | `outputs/origin_exports/business_site/` | `outputs/excel_exports/business_site/` | 产品与基础数据、年度计划与任务、方案编制、监控项目、数据分析、一键分析、报告编制、业务站点配置和异步任务 |
+
+- 跨站点登录、站点切换、统一门户入口类用例，优先归入 `public_site`。
+- 业务数据隔离、业务站点内权限和 CPV 主流程类用例，优先归入 `business_site`。
+- 同一需求同时影响两个站点时，按主验证目标拆分或分别生成，避免公共管理菜单和业务站点菜单混写。
+
 Markdown 输出路径固定为：
 
 ```text

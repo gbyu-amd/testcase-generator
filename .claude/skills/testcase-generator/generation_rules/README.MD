@@ -1,10 +1,10 @@
 # generation_rules 读取说明
 
-`generation_rules` 用于维护测试用例生成规范，负责回答“测试用例如何流转、应该怎么写、如何校验导出”。生成测试用例时，应固定读取本目录下的全部核心规则文件，确保生成口径稳定一致。
+`generation_rules` 用于维护测试用例生成规范，负责回答“测试用例如何流转、应该怎么写、如何校验导出”。生成测试用例时，应按 `workflow_rules.md` 中的读取顺序读取核心规则文件，确保生成口径稳定一致。
 
 ## 读取原则
 
-- 每次生成测试用例前固定读取：`workflow_rules.md`、`case_append_rules.md`、`testcase_writing_guidelines.md`、`coverage_dimension_rules.md`、`priority_rules.md`、`difficulty_level_rules.md`。
+- 实际读取顺序以 `workflow_rules.md` 的“资料读取顺序”为唯一来源，本文件不重复维护必读清单。
 - 各规则分别覆盖执行流程、追加去重与输出路径、写法质量、覆盖维度、优先级和难度判定。
 - `README.MD` 仅作为目录说明，不属于生成前必读规则。
 
@@ -20,5 +20,5 @@
 - `coverage_dimension_rules.md`：覆盖维度规则，包含正向、异常、边界、权限、状态、数据一致性、合规追溯等维度。
 - `priority_rules.md`：优先级判定规则。
 - `difficulty_level_rules.md`：用例难度等级判定规则。
-- `case_append_rules.md`：已有用例追加、覆盖、另存和去重规则。
-- `workflow_rules.md`：输入资料处理、站点分类、元信息、需求覆盖率、校验和导出闭环。
+- `case_append_rules.md`：站点分类、输出路径、追加、覆盖、另存、参考模板匹配和去重规则。
+- `workflow_rules.md`：输入资料处理、资料读取顺序、元信息、需求覆盖率、校验和导出闭环。

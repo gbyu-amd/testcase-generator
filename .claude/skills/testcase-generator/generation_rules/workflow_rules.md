@@ -60,25 +60,13 @@ Get-ChildItem inputs/ui_design/
 
 ## 参考资料使用
 
-- 生成前必须先读取 `testcase_templates/modules/menu_index.md`，按 CPV 菜单路径匹配参考文件。
-- 参考用例只读，不得修改 `testcase_templates/`。
+- 参考模板匹配、读取范围和只读约束以 `case_append_rules.md` 的“参考模板匹配”为唯一来源。
 - 若 UI 图与 PRD 描述存在字段、数据结构或字数限制等冲突，停止生成并询问用户以哪个为准。
 - 若资料缺失，可以继续生成，但必须在元信息或回复中写明缺失资料和生成假设。
 
-## 站点分类和输出位置
+## 输出归属和文件处理
 
-| 站点分类 | Markdown 输出 | Excel 输出 | 适用范围 |
-|---|---|---|---|
-| 公共管理站点 | `outputs/origin_exports/public_site/` | `outputs/excel_exports/public_site/` | 统一门户、站点管理、全局用户、权限管理、系统服务管理、公共管理审计、登录日志 |
-| 业务站点 | `outputs/origin_exports/business_site/` | `outputs/excel_exports/business_site/` | 产品与基础数据、年度计划与任务、方案编制、监控项目、数据分析、一键分析、报告编制、业务站点配置和异步任务 |
-
-- 跨站点登录、站点切换、统一门户入口类用例，优先归入 `public_site`。
-- 业务数据隔离、业务站点内权限和 CPV 主流程类用例，优先归入 `business_site`。
-- 同一需求同时影响两个站点时，按主验证目标拆分或分别生成，避免公共管理菜单和业务站点菜单混写。
-
-## 输出文件处理
-
-输出路径、模块命名、追加 / 覆盖 / 另存和去重规则以 `case_append_rules.md` 为唯一来源。本文件只维护输入资料、元信息、覆盖率、校验和导出闭环。
+站点分类、Markdown / Excel 输出根目录、默认输出文件、模块命名、追加 / 覆盖 / 另存和去重规则以 `case_append_rules.md` 为唯一来源。本文件只维护输入资料、元信息、覆盖率、校验和导出闭环。
 
 ## 元信息和覆盖率
 
@@ -103,7 +91,7 @@ Get-ChildItem inputs/ui_design/
 | 需求点 / 验收标准 | 需求描述 | 覆盖用例名称 |
 |---|---|---|
 
-- 每条 PRD 需求点至少对应一条用例，核心链路需求应有 P0 用例覆盖。
+- 每条 PRD 需求点至少对应一条用例，核心链路需求应有核心用例覆盖；优先级按 `priority_rules.md` 判定。
 - 未覆盖项必须显式列出并说明原因。
 
 ## 校验和导出闭环

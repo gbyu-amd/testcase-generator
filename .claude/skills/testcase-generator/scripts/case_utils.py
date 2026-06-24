@@ -179,7 +179,7 @@ def _normalize_keyword_text(*values: str) -> str:
 def _normalize_report_lifecycle_text(*values: str) -> str:
     """移除错误报告等非报告编制链路词，避免误命中报告强规则。"""
     text = _normalize_keyword_text(*values)
-    for keyword in ("txt错误报告", "错误报告", "失败报告"):
+    for keyword in REPORT_LIFECYCLE_EXCLUSIONS:
         text = text.replace(keyword, "")
     return text
 
@@ -227,124 +227,82 @@ def is_ui_case(description: str) -> bool:
     return normalize_cell(description).upper() == "UI"
 
 
-DIFFICULT_HIGH_CONFIDENCE_KEYWORDS = [
-    "一键分析",
-    "数据迁移",
-    "跨环境",
-    "第三方",
-    "minitab",
-    "多角色",
-    "多人",
-    "会签",
-    "工作流",
-    "数据完整性",
-    "一致性验证",
-    "分析结果数据正确性校验",
-]
+DIFFICULTY_RULE_BLOCK_RE = re.compile(
+    r"<!--\s*difficulty-rule:([a-z_]+)\s*-->(.*?)<!--\s*/difficulty-rule\s*-->",
+    re.DOTALL,
+)
 
-GENERAL_HIGH_CONFIDENCE_KEYWORDS = [
-    "导入",
-    "批量导出",
-    "跨页面",
-    "跨模块",
-    "审计追踪详情",
-    "批量删除",
-    "组合搜索",
-    "组合查询",
-]
 
-GENERAL_STEP_EXPECTATION_KEYWORDS = [
-    "导入",
-    "跨页面",
-    "跨模块",
-]
+def _load_difficulty_rule_config() -> dict[str, str]:
+    rules_path = project_root() / "generation_rules" / "difficulty_level_rules.md"
+    markdown_text = read_text_file(rules_path, encoding="utf-8")
+    config = {
+        match.group(1): match.group(2).strip()
+        for match in DIFFICULTY_RULE_BLOCK_RE.finditer(markdown_text)
+    }
+    if not config:
+        raise ValueError("difficulty_level_rules.md 缺少 difficulty-rule 配置块")
+    return config
 
-DIFFICULT_KEYWORD_COMBINATIONS = [
-    ("跨模块", "校验"),
-]
 
-GENERAL_KEYWORD_COMBINATIONS = [
-    ("批量", "删除"),
-    ("批量", "导出"),
-    ("组合", "搜索"),
-    ("组合", "查询"),
-    ("审计追踪", "详情"),
-    ("查看", "详情"),
-    ("报告", "生成"),
-    ("报告", "导出"),
-]
+def _config_string_list(config: dict[str, str], key: str) -> list[str]:
+    value = config.get(key)
+    if value is None:
+        raise ValueError(f"difficulty_level_rules.md 缺少 difficulty-rule:{key}")
 
-SIMPLE_KEYWORDS = [
-    "列表页",
-    "翻页",
-    "排序",
-    "筛选重置",
-    "刷新",
-    "启用/停用",
-    "启用",
-    "停用",
-    "重置",
-    "单项操作",
-    "单页面提交",
-    "新增",
-    "增加",
-    "添加",
-    "编辑",
-    "删除",
-    "搜索",
-    "查询",
-    "单字段校验",
-    "必填",
-    "长度",
-    "格式提示",
-    "下拉多选",
-    "下拉选项",
-    "提示语校验",
-    "导出",
-    "单文件导出",
-]
+    keywords = [keyword.strip() for keyword in re.findall(r"`([^`]+)`", value)]
+    if not keywords:
+        raise ValueError(f"difficulty-rule:{key} 必须至少包含一个反引号关键字")
+    return keywords
 
-SIMPLE_FIELD_VALIDATION_KEYWORDS = [
-    "单字段校验",
-    "必填",
-    "格式提示",
-    "长度",
-]
 
-SIMPLE_FIELD_VALIDATION_EXCLUSIONS = [
-    "导入",
-    "批量",
-    "跨模块",
-    "多字段",
-    "组合",
-    "数据一致性",
-    "数据完整性",
-    "分析结果数据正确性校验",
-    "计算",
-    "保存成功",
-    "新增成功",
-    "导出成功",
-    "推送成功",
-    "状态变为",
-    "状态更新",
-]
+def _config_combinations(config: dict[str, str], key: str) -> list[tuple[str, ...]]:
+    value = config.get(key)
+    if value is None:
+        raise ValueError(f"difficulty_level_rules.md 缺少 difficulty-rule:{key}")
 
-BUSINESS_RISK_KEYWORDS = [
-    "流转",
-    "联动",
-    "跨模块",
-    "数据一致性",
-    "报告",
-    "分析结果",
-    "回传",
-    "推送",
-    "数据分析",
-    "监控项目",
-]
+    combinations: list[tuple[str, ...]] = []
+    for line in value.splitlines():
+        keywords = [keyword.strip() for keyword in re.findall(r"`([^`]+)`", line)]
+        if keywords:
+            if len(keywords) < 2:
+                raise ValueError(f"difficulty-rule:{key} 的组合至少需要两个关键字")
+            combinations.append(tuple(keywords))
+    if not combinations:
+        raise ValueError(f"difficulty-rule:{key} 必须至少包含一个关键字组合")
+    return combinations
+
+
+DIFFICULTY_RULE_CONFIG = _load_difficulty_rule_config()
+
+REPORT_LIFECYCLE_EXCLUSIONS = _config_string_list(
+    DIFFICULTY_RULE_CONFIG, "report_lifecycle_exclusions"
+)
+DIFFICULT_HIGH_CONFIDENCE_KEYWORDS = _config_string_list(
+    DIFFICULTY_RULE_CONFIG, "difficult_high_confidence_keywords"
+)
+DIFFICULT_TITLE_ONLY_KEYWORDS = _config_string_list(
+    DIFFICULTY_RULE_CONFIG, "difficult_title_only_keywords"
+)
+DIFFICULT_KEYWORD_COMBINATIONS = _config_combinations(
+    DIFFICULTY_RULE_CONFIG, "difficult_keyword_combinations"
+)
+COMPLEXITY_KEYWORDS = _config_string_list(
+    DIFFICULTY_RULE_CONFIG, "complexity_keywords"
+)
+COMPLEXITY_KEYWORD_COMBINATIONS = _config_combinations(
+    DIFFICULTY_RULE_CONFIG, "complexity_keyword_combinations"
+)
+SIMPLE_FIELD_VALIDATION_KEYWORDS = _config_string_list(
+    DIFFICULTY_RULE_CONFIG, "simple_field_validation_keywords"
+)
+SIMPLE_OPERATION_KEYWORDS = _config_string_list(
+    DIFFICULTY_RULE_CONFIG, "simple_operation_keywords"
+)
 
 
 def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[str]]:
-    """综合强规则、复杂度评分和简单信号推断难度，并返回判定原因。"""
+    """综合强规则、简单优先规则和复杂度评分推断难度，并返回判定原因。"""
     title_text = case.get("用例名称", "")
     description_text = case.get("用例描述", "")
     precondition_text = case.get("前置条件", "")
@@ -358,21 +316,20 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
     normalized_report_lifecycle_text = _normalize_report_lifecycle_text(
         title_text, step_text
     )
-    normalized_simple_text = _normalize_keyword_text(title_text, step_text, expectation_text)
-    normalized_full_text = _normalize_keyword_text(
-        title_text,
-        description_text,
-        precondition_text,
-        step_text,
-        expectation_text,
-    )
-
     hard_reasons: list[str] = []
     hard_title_keywords = _matched_keywords(
         normalized_title_text, DIFFICULT_HIGH_CONFIDENCE_KEYWORDS
     )
     if hard_title_keywords:
         hard_reasons.append(f"用例名称命中困难强规则关键字：{'、'.join(hard_title_keywords)}")
+
+    hard_title_only_keywords = _matched_keywords(
+        normalized_title_text, DIFFICULT_TITLE_ONLY_KEYWORDS
+    )
+    if hard_title_only_keywords:
+        hard_reasons.append(
+            f"用例名称命中仅标题困难强规则关键字：{'、'.join(hard_title_only_keywords)}"
+        )
 
     hard_step_keywords = _matched_keywords(
         normalized_step_expectation_text, DIFFICULT_HIGH_CONFIDENCE_KEYWORDS
@@ -422,76 +379,72 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
         score += 1
         reasons.append(f"预期结果 {verification_count} 个校验点，验证中等 +1")
 
-    general_title_keywords = _matched_keywords(
-        normalized_title_text, GENERAL_HIGH_CONFIDENCE_KEYWORDS
+    complexity_combinations = _matched_combinations(
+        normalized_combination_text, COMPLEXITY_KEYWORD_COMBINATIONS
     )
-    general_step_keywords = _matched_keywords(
-        normalized_step_expectation_text, GENERAL_STEP_EXPECTATION_KEYWORDS
-    )
-    general_combinations = _matched_combinations(
-        normalized_combination_text, GENERAL_KEYWORD_COMBINATIONS
-    )
-    general_signals = general_title_keywords + general_step_keywords + general_combinations
-    if general_signals:
-        score += 1
-        reasons.append(f"命中一般复杂度信号：{'、'.join(general_signals)} +1")
-
-    risk_fields = (title_text, step_text, expectation_text) if ui_case else (
+    complexity_keyword_fields = (title_text, step_text, expectation_text) if ui_case else (
         title_text,
         description_text,
         precondition_text,
         step_text,
         expectation_text,
     )
-    risk_text = _normalize_report_lifecycle_text(*risk_fields)
-    business_risk_keywords = _matched_keywords(risk_text, BUSINESS_RISK_KEYWORDS)
-    if business_risk_keywords:
-        risk_score = 1
-        score += risk_score
-        reasons.append(
-            f"命中业务风险信号：{'、'.join(business_risk_keywords)} +{risk_score}"
-        )
+    complexity_keyword_text = _normalize_report_lifecycle_text(
+        *complexity_keyword_fields
+    )
+    complexity_keywords = _matched_keywords(
+        complexity_keyword_text, COMPLEXITY_KEYWORDS
+    )
+    complexity_signals = list(
+        dict.fromkeys(complexity_keywords + complexity_combinations)
+    )
+    if complexity_signals:
+        score += 1
+        reasons.append(f"命中复杂度信号：{'、'.join(complexity_signals)} +1")
 
-    simple_keywords = _matched_keywords(normalized_simple_text, SIMPLE_KEYWORDS)
+    import_case = "导入" in normalized_combination_text
+
     simple_field_validation_keywords = _matched_keywords(
         normalized_title_text, SIMPLE_FIELD_VALIDATION_KEYWORDS
-    )
-    simple_field_validation_exclusions = _matched_keywords(
-        normalized_full_text, SIMPLE_FIELD_VALIDATION_EXCLUSIONS
     )
     if (
         simple_field_validation_keywords
         and verification_count <= 1
         and precondition_count <= 3
         and step_count <= 3
-        and not general_signals
-        and not simple_field_validation_exclusions
+        and not complexity_signals
     ):
         return "简单", [
             "单字段提示类校验，"
             f"命中简单校验信号：{'、'.join(simple_field_validation_keywords)}"
         ]
 
+    simple_operation_keywords = _matched_keywords(
+        normalized_title_text, SIMPLE_OPERATION_KEYWORDS
+    )
     if (
-        simple_keywords
-        and score <= 1
-        and precondition_count <= 1
-        and step_count <= 2
-        and verification_count <= 1
-        and not business_risk_keywords
+        simple_operation_keywords
+        and verification_count <= 3
+        and precondition_count <= 4
+        and step_count <= 4
+        and not complexity_signals
     ):
-        return "简单", [f"低复杂度操作且命中简单信号：{'、'.join(simple_keywords)}"]
+        return "简单", [
+            "基础配置项或字段级操作校验，"
+            f"命中简单操作信号：{'、'.join(simple_operation_keywords)}"
+        ]
 
     if score >= 5:
         if ui_case:
             reasons.append("UI 展示类用例未命中强规则，最高按一般处理")
             return "一般", reasons
+        if import_case:
+            reasons.append("导入场景未命中困难强规则，最高按一般处理")
+            return "一般", reasons
         return "困难", reasons or [f"综合复杂度得分 {score}"]
     if score >= 2:
         return "一般", reasons or [f"综合复杂度得分 {score}"]
 
-    if simple_keywords:
-        reasons.append(f"命中简单信号：{'、'.join(simple_keywords)}，但仅作为低复杂度参考")
     return "简单", reasons or ["未命中复杂信号，前置、步骤和验证点均较少"]
 
 
