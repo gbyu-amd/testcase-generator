@@ -20,19 +20,7 @@
 
 CPV（持续工艺确认）系统是一个面向制药行业工艺验证的闭环管理平台。它通过年度计划驱动、任务执行跟踪、方案模版标准化、监控项目数据分析和报告自动生成的全流程数字化管理，将传统的纸质化、离散式工艺监控转变为线上化、自动化、智能化的合规管理体系。
 
-## 名词解释
-
-| 术语 | 全称 | 解释 |
-|---|---|---|
-| CPV | Continued Process Verification | 持续工艺确认 |
-| CPP | Critical Process Parameter | 关键工艺参数 |
-| CQA | Critical Quality Attribute | 关键质量属性 |
-| CMA | Critical Material Attribute | 关键物料属性 |
-| IPC | In-Process Control | 中间过程控制 |
-| OOS | Out of Specification | 超标结果 |
-| OOT | Out of Trend | 超趋势结果 |
-| CAPA | Corrective and Preventive Action | 纠正与预防措施 |
-| SPC | Statistical Process Control | 统计过程控制 |
+业务术语统一维护在 `business_glossary.md`，本文件不重复维护术语解释。
 
 ## 主要功能模块
 

@@ -409,7 +409,7 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
     )
     if (
         simple_field_validation_keywords
-        and verification_count <= 1
+        and verification_count <= 3
         and precondition_count <= 3
         and step_count <= 3
         and not complexity_signals
@@ -442,7 +442,7 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
             reasons.append("导入场景未命中困难强规则，最高按一般处理")
             return "一般", reasons
         return "困难", reasons or [f"综合复杂度得分 {score}"]
-    if score >= 2:
+    if score >= 3:
         return "一般", reasons or [f"综合复杂度得分 {score}"]
 
     return "简单", reasons or ["未命中复杂信号，前置、步骤和验证点均较少"]
