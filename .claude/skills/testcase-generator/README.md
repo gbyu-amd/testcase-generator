@@ -20,14 +20,13 @@ testcase-generator/
 ├── inputs/               # 输入层：本次生成的素材
 │   ├── requirements/     # 需求文档
 │   │   ├── raw_docs/     # 原始 Word 文档（.docx）
-│   │   ├── current_prd.md# 当前 Markdown PRD（由 convert_docx.py 生成）
 │   │   └── archive/      # 历史 PRD 归档
 │   └── ui_design/        # 界面设计图，按章节名组织
 │       ├── 报告编制/      # 目录名 = PRD 章节名
 │       ├── 年度计划/
 │       └── _incoming/    # 待归类图片
-├── scripts/              # 脚本层：转换、校验和导出
-│   ├── convert_docx.py   # Word 转 Markdown（忽略图片），支持按章节提取
+├── scripts/              # 脚本层：Word 读取、校验和导出
+│   ├── extract_docx.py   # 直接从 Word 列章节 / 提取章节（忽略图片）
 │   ├── validate_cases.py # 校验格式、质量、优先级和重复场景
 │   └── export_testcases.py # 导出 Excel
 └── outputs/              # 输出层
@@ -42,12 +41,12 @@ testcase-generator/
 ## 工作流程
 
 ```
-用户提供 Word 文件或 current_prd.md + 章节名
+用户提供 Word 文件 + 章节名
        │
        ▼
 ① AI 提取章节内容
-   - Word：先 convert_docx.py --overwrite 覆盖 inputs/requirements/current_prd.md，再从 current_prd.md 提取章节
-   - Markdown：直接读取 inputs/requirements/current_prd.md 对应章节
+   - 默认用 extract_docx.py --section "<章节名>" --print 直接从 .docx 提取章节
+   - 原始 .docx 是需求事实源，不生成中间需求文件
        │
        ▼
 ② AI 读取同名 UI 图目录（inputs/ui_design/<章节名>/）
@@ -101,14 +100,13 @@ testcase-generator/
 
 | 输入类型 | 保存位置 | 说明 |
 |---|---|---|
-| 原始 Word 文档 | `inputs/requirements/raw_docs/` | 产品经理提供的 .docx，正式生成前先整份转换覆盖 `current_prd.md` |
-| 当前 Markdown PRD | `inputs/requirements/current_prd.md` | 已转换或人工维护的当前 PRD，可直接按章节生成用例 |
+| 原始 Word 文档 | `inputs/requirements/raw_docs/` | 产品经理提供的 .docx，默认作为事实源直接按章节读取 |
 | UI 设计图 | `inputs/ui_design/<章节名>/` | 目录名与 PRD 章节名一致，AI 自动匹配读取 |
 | 历史 PRD 归档 | `inputs/requirements/archive/` | 已处理过的历史版本 |
 
 ### 2. 提出需求
 
-直接在对话中说明 PRD 文件和章节名，无需手动执行任何脚本。可以使用原始 Word，也可以直接使用 `current_prd.md`：
+直接在对话中说明 PRD 文件和章节名，无需手动执行任何脚本：
 
 ```
 根据 inputs/requirements/raw_docs/tangyao_prd.docx 的"报告编制"章节生成测试用例
@@ -116,14 +114,6 @@ testcase-generator/
 
 ```
 根据 inputs/requirements/raw_docs/tangyao_prd.docx 的"权限管理"章节追加生成测试用例
-```
-
-```
-根据 inputs/requirements/current_prd.md 的"配对T检验"章节生成测试用例
-```
-
-```
-根据 current_prd.md 的"监控项目"章节补充测试用例
 ```
 
 不确定章节名时，可以先问：
@@ -144,7 +134,7 @@ Agent 会自动完成校验和导出，最终输出：
 
 大部分脚本仅使用 Python 标准库，建议使用 Python 3.10 或更高版本。
 
-`convert_docx.py` 需要额外安装 `python-docx`，其余脚本无需额外依赖。
+`extract_docx.py` 需要额外安装 `python-docx`，其余脚本无需额外依赖。
 
 ### 初始化虚拟环境
 
@@ -170,20 +160,17 @@ C:\venv\testcase\Scripts\pip install python-docx
 运行脚本时用完整路径：
 
 ```powershell
-C:\venv\testcase\Scripts\python scripts/convert_docx.py ...
+C:\venv\testcase\Scripts\python scripts/extract_docx.py ...
 ```
 
 ## 脚本命令
 
 ```bash
 # 列出 Word 文档所有章节（不确定章节名时先执行）
-python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --list-sections
+python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --list-sections
 
-# 临时排查章节转换问题时打印指定章节；正式生成不得用它替代 --overwrite
-python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --section "<章节名>" --print
-
-# 将 Word 文档整体转换为 Markdown（正式生成 Word PRD 用例前必须执行）
-python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --overwrite
+# 从 Word 直接提取指定章节（正式生成默认推荐）
+python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --section "<章节名>" --print
 
 # 校验本次生成的用例
 python scripts/validate_cases.py --source outputs/origin_exports/<site_type>/<module_name>_testcases.md

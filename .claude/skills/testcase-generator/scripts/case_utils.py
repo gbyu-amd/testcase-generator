@@ -179,7 +179,7 @@ def _normalize_keyword_text(*values: str) -> str:
 def _normalize_report_lifecycle_text(*values: str) -> str:
     """移除错误报告等非报告编制链路词，避免误命中报告强规则。"""
     text = _normalize_keyword_text(*values)
-    for keyword in REPORT_LIFECYCLE_EXCLUSIONS:
+    for keyword in _difficulty_string_list("report_lifecycle_exclusions"):
         text = text.replace(keyword, "")
     return text
 
@@ -273,36 +273,55 @@ def _config_combinations(config: dict[str, str], key: str) -> list[tuple[str, ..
     return combinations
 
 
-DIFFICULTY_RULE_CONFIG = _load_difficulty_rule_config()
+_DIFFICULTY_RULE_CONFIG: dict[str, str] | None = None
+_DIFFICULTY_STRING_CACHE: dict[str, list[str]] = {}
+_DIFFICULTY_COMBINATION_CACHE: dict[str, list[tuple[str, ...]]] = {}
 
-REPORT_LIFECYCLE_EXCLUSIONS = _config_string_list(
-    DIFFICULTY_RULE_CONFIG, "report_lifecycle_exclusions"
-)
-DIFFICULT_HIGH_CONFIDENCE_KEYWORDS = _config_string_list(
-    DIFFICULTY_RULE_CONFIG, "difficult_high_confidence_keywords"
-)
-DIFFICULT_TITLE_ONLY_KEYWORDS = _config_string_list(
-    DIFFICULTY_RULE_CONFIG, "difficult_title_only_keywords"
-)
-DIFFICULT_KEYWORD_COMBINATIONS = _config_combinations(
-    DIFFICULTY_RULE_CONFIG, "difficult_keyword_combinations"
-)
-COMPLEXITY_KEYWORDS = _config_string_list(
-    DIFFICULTY_RULE_CONFIG, "complexity_keywords"
-)
-COMPLEXITY_KEYWORD_COMBINATIONS = _config_combinations(
-    DIFFICULTY_RULE_CONFIG, "complexity_keyword_combinations"
-)
-SIMPLE_FIELD_VALIDATION_KEYWORDS = _config_string_list(
-    DIFFICULTY_RULE_CONFIG, "simple_field_validation_keywords"
-)
-SIMPLE_OPERATION_KEYWORDS = _config_string_list(
-    DIFFICULTY_RULE_CONFIG, "simple_operation_keywords"
-)
+
+def _difficulty_config() -> dict[str, str]:
+    """Load difficulty rules lazily so lightweight helpers remain import-safe."""
+    global _DIFFICULTY_RULE_CONFIG
+    if _DIFFICULTY_RULE_CONFIG is None:
+        _DIFFICULTY_RULE_CONFIG = _load_difficulty_rule_config()
+    return _DIFFICULTY_RULE_CONFIG
+
+
+def _difficulty_string_list(key: str) -> list[str]:
+    if key not in _DIFFICULTY_STRING_CACHE:
+        _DIFFICULTY_STRING_CACHE[key] = _config_string_list(_difficulty_config(), key)
+    return _DIFFICULTY_STRING_CACHE[key]
+
+
+def _difficulty_combinations(key: str) -> list[tuple[str, ...]]:
+    if key not in _DIFFICULTY_COMBINATION_CACHE:
+        _DIFFICULTY_COMBINATION_CACHE[key] = _config_combinations(
+            _difficulty_config(), key
+        )
+    return _DIFFICULTY_COMBINATION_CACHE[key]
 
 
 def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[str]]:
     """综合强规则、简单优先规则和复杂度评分推断难度，并返回判定原因。"""
+    difficult_high_confidence_keywords = _difficulty_string_list(
+        "difficult_high_confidence_keywords"
+    )
+    difficult_title_only_keywords = _difficulty_string_list(
+        "difficult_title_only_keywords"
+    )
+    difficult_keyword_combinations = _difficulty_combinations(
+        "difficult_keyword_combinations"
+    )
+    complexity_keywords_config = _difficulty_string_list("complexity_keywords")
+    complexity_keyword_combinations = _difficulty_combinations(
+        "complexity_keyword_combinations"
+    )
+    simple_field_validation_keywords_config = _difficulty_string_list(
+        "simple_field_validation_keywords"
+    )
+    simple_operation_keywords_config = _difficulty_string_list(
+        "simple_operation_keywords"
+    )
+
     title_text = case.get("用例名称", "")
     description_text = case.get("用例描述", "")
     precondition_text = case.get("前置条件", "")
@@ -318,13 +337,13 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
     )
     hard_reasons: list[str] = []
     hard_title_keywords = _matched_keywords(
-        normalized_title_text, DIFFICULT_HIGH_CONFIDENCE_KEYWORDS
+        normalized_title_text, difficult_high_confidence_keywords
     )
     if hard_title_keywords:
         hard_reasons.append(f"用例名称命中困难强规则关键字：{'、'.join(hard_title_keywords)}")
 
     hard_title_only_keywords = _matched_keywords(
-        normalized_title_text, DIFFICULT_TITLE_ONLY_KEYWORDS
+        normalized_title_text, difficult_title_only_keywords
     )
     if hard_title_only_keywords:
         hard_reasons.append(
@@ -332,7 +351,7 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
         )
 
     hard_step_keywords = _matched_keywords(
-        normalized_step_expectation_text, DIFFICULT_HIGH_CONFIDENCE_KEYWORDS
+        normalized_step_expectation_text, difficult_high_confidence_keywords
     )
     if hard_step_keywords:
         hard_reasons.append(
@@ -340,7 +359,7 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
         )
 
     hard_combinations = _matched_combinations(
-        normalized_report_lifecycle_text, DIFFICULT_KEYWORD_COMBINATIONS
+        normalized_report_lifecycle_text, difficult_keyword_combinations
     )
     if hard_combinations:
         hard_reasons.append(f"命中困难组合关键字：{'、'.join(hard_combinations)}")
@@ -380,7 +399,7 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
         reasons.append(f"预期结果 {verification_count} 个校验点，验证中等 +1")
 
     complexity_combinations = _matched_combinations(
-        normalized_combination_text, COMPLEXITY_KEYWORD_COMBINATIONS
+        normalized_combination_text, complexity_keyword_combinations
     )
     complexity_keyword_fields = (title_text, step_text, expectation_text) if ui_case else (
         title_text,
@@ -393,7 +412,7 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
         *complexity_keyword_fields
     )
     complexity_keywords = _matched_keywords(
-        complexity_keyword_text, COMPLEXITY_KEYWORDS
+        complexity_keyword_text, complexity_keywords_config
     )
     complexity_signals = list(
         dict.fromkeys(complexity_keywords + complexity_combinations)
@@ -405,7 +424,7 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
     import_case = "导入" in normalized_combination_text
 
     simple_field_validation_keywords = _matched_keywords(
-        normalized_title_text, SIMPLE_FIELD_VALIDATION_KEYWORDS
+        normalized_title_text, simple_field_validation_keywords_config
     )
     if (
         simple_field_validation_keywords
@@ -420,7 +439,7 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
         ]
 
     simple_operation_keywords = _matched_keywords(
-        normalized_title_text, SIMPLE_OPERATION_KEYWORDS
+        normalized_title_text, simple_operation_keywords_config
     )
     if (
         simple_operation_keywords
@@ -483,9 +502,10 @@ def parse_case_file(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     found_table = False
     while index < len(lines):
         cells = [normalize_cell(cell) for cell in split_markdown_row(lines[index])]
-        if cells != EXPECTED_HEADERS:
+        if len(cells) != len(EXPECTED_HEADERS) or set(cells) != set(EXPECTED_HEADERS):
             index += 1
             continue
+        header_indexes = {header: cells.index(header) for header in EXPECTED_HEADERS}
 
         found_table = True
         index += 1
@@ -517,7 +537,10 @@ def parse_case_file(path: Path) -> tuple[list[dict[str, str]], list[str]]:
                 index += 1
                 continue
 
-            case = dict(zip(EXPECTED_HEADERS, normalized_cells))
+            case = {
+                header: normalized_cells[header_indexes[header]]
+                for header in EXPECTED_HEADERS
+            }
             case["_source_file"] = str(path)
             case["_source_line"] = str(index + 1)
             cases.append(case)

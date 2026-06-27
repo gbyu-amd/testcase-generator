@@ -7,7 +7,7 @@
 ## 脚本列表
 
 - `case_utils.py`：公共工具模块，提供表头定义、路径安全检查、Markdown 表格解析和文件发现逻辑，不需要直接运行。
-- `convert_docx.py`：将 Word (.docx) 文档转换为 Markdown，忽略所有图片。正式生成用例时必须先整份转换并覆盖 `inputs/requirements/current_prd.md`；`--section --print` 仅用于临时排查章节转换问题。
+- `extract_docx.py`：从 Word (.docx) 文档直接列出章节或提取指定章节，忽略所有图片；脚本只打印到标准输出，不生成中间需求文件。
 - `validate_cases.py`：检查标准表头、字段完整性、优先级、重复用例名称和重复流程，支持 ERROR/WARN 分级、JSON 输出和安全格式修复。
 - `export_testcases.py`：将模块 Markdown 用例导出为 Excel 表格文件，导出前会先执行完整校验。
 
@@ -24,6 +24,22 @@
 
 脚本只负责机械校验和安全格式修复；前置条件、预期结果、重复用例、优先级和用例描述等业务语义问题应由 Agent 或测试人员根据资料修复。
 
+
+## Word 章节提取脚本
+
+### 列出 Word 文档章节
+
+```bash
+python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --list-sections
+```
+
+### 提取指定章节到标准输出
+
+```bash
+python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --section "<章节名>" --print
+```
+
+`extract_docx.py` 必须显式传入 `.docx` 路径；脚本只读取 Word 文档并打印章节文本，不写入中间 Markdown 需求文件。
 
 ## 校验用例脚本
 

@@ -6,31 +6,21 @@
 requirements/
 ├── raw_docs/           # 原始 Word 文档（.docx）
 │   └── tangyao_prd.docx
-├── current_prd.md      # 当前 Markdown PRD（由脚本生成，可随时重新生成）
-└── archive/            # 历史 Markdown PRD（按需手动归档）
+└── archive/            # 历史原始 PRD（按需手动归档）
 ```
 
 ## 日常使用
 
-在对话中指定章节名，AI 自动提取内容生成用例，无需手动执行任何脚本。支持两种方式：
-
-**直接使用 Word 文件（推荐）：**
+在对话中指定 Word 文件和章节名，AI 自动提取内容生成用例，无需手动执行任何脚本：
 
 ```text
 根据 inputs/requirements/raw_docs/tangyao_prd.docx 的"报告编制"章节生成测试用例
 ```
 
-**使用已转换的 Markdown PRD：**
-
-```text
-根据 inputs/requirements/current_prd.md 的"报告编制"章节生成测试用例
-```
-
 更换 PRD 时：
 
-1. 将当前 `current_prd.md` 手动复制到 `archive/`，重命名为 `<PM名>_prd_YYYYMMDD.md`
-2. 将新 Word 文件放入 `raw_docs/`
-3. 在对话中指定新文件和章节名开始生成，例如：
+1. 将新 Word 文件放入 `raw_docs/`
+2. 在对话中指定新文件和章节名开始生成，例如：
 
 ```text
 根据 inputs/requirements/raw_docs/tangyao_prd.docx 的"报告编制"章节生成测试用例
@@ -38,10 +28,10 @@ requirements/
 
 ## 可选操作
 
-如需将整份 PRD 转为 Markdown 备用：
+不确定章节名时，可以先列出 Word 章节：
 
 ```bash
-python scripts/convert_docx.py inputs/requirements/raw_docs/<文件名>.docx --overwrite
+python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --list-sections
 ```
 
 ## 阅读重点

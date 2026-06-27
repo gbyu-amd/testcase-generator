@@ -68,6 +68,7 @@
 |---|---|
 | 涉及 Excel / CSV / 模板文件导入、批量导入、导入模板、错误报告 | `generation_rules/import_coverage_rules.md` |
 | 新增或补充分析方法、数据分析详情页、分析结果、数据源预览、替换数据源、一键分析 | `generation_rules/data_analysis_coverage_rules.md` |
+| 涉及审计追踪、电子签名记录、操作日志、操作前后值、详情导出、合规追溯 | `generation_rules/audit_trail_coverage_rules.md` |
 
 专项规则只补充覆盖场景，不替代：
 

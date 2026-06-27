@@ -55,7 +55,6 @@ from case_utils import (
     configure_output_encoding,
     discover_case_files,
     ensure_under,
-    infer_case_difficulty,
     infer_case_difficulty_with_reason,
     is_separator_row,
     normalize_cell,
@@ -534,14 +533,21 @@ def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
     for module, keyword_groups in CORE_FLOW_KEYWORDS.items():
         if not any(module in present for present in modules_present):
             continue
+        module_cases = [case for case in cases if module in case_group(case)]
+        scoped_keyword_groups = keyword_groups
+        if module == "报告编制" and module_cases and all(
+            "导出" in case_group(case) for case in module_cases
+        ):
+            scoped_keyword_groups = [
+                groups for groups in keyword_groups if groups[0] not in {"审批", "生效"}
+            ]
         module_text = "".join(
             f"{case['用例名称']}{case['前置条件']}{case['用例步骤']}{case['预期结果']}".lower()
-            for case in cases
-            if module in case_group(case)
+            for case in module_cases
         )
         missing_groups = [
             groups[0]
-            for groups in keyword_groups
+            for groups in scoped_keyword_groups
             if not any(keyword.lower() in module_text for keyword in groups)
         ]
         if missing_groups:
