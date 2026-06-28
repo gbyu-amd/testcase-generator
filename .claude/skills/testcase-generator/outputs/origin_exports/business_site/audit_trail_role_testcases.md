@@ -12,7 +12,7 @@
   - generation_rules/difficulty_level_rules.md（最后修改：未知）
   - generation_rules/audit_trail_coverage_rules.md（最后修改：未知）
   - testcase_templates/modules/menu_index.md（最后修改：未知）
-  - testcase_templates/modules/business_site/configuration_manage/audit_trail_template.md（最后修改：未知）
+  - testcase_templates/modules/business_site/configuration_manage/audit_trail_role_manage_template.md（最后修改：未知）
   - knowledge_base/user_roles.md（最后修改：未知）
 生成假设：
   - 未找到与“业务站点的角色管理审计内容优化”同名 UI 设计图目录，本次按 PRD 原文、审计追踪专项规则和业务站点审计追踪参考模板生成。

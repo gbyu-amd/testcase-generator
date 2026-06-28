@@ -56,7 +56,10 @@ from validate_cases import (
     text_issue,
     validate_case_rows,
     validate_core_flow_coverage,
+    validate_data_analysis_one_click_rules,
     validate_duplicates,
+    validate_file_sources,
+    validate_ui_case_deduplication,
 )
 
 INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
@@ -402,8 +405,11 @@ def main(argv: list[str]) -> int:
             text_issue("ERROR", "parse_error", warning) for warning in warnings
         ]
         validation_issues.extend(validate_case_rows(cases))
+        validation_issues.extend(validate_ui_case_deduplication(cases))
+        validation_issues.extend(validate_file_sources(group_files, cases))
         validation_issues.extend(validate_duplicates(cases))
         validation_issues.extend(validate_core_flow_coverage(cases))
+        validation_issues.extend(validate_data_analysis_one_click_rules(cases))
 
         if validation_issues:
             print(f"导出前校验结果（{group_name}）：")

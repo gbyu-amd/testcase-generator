@@ -38,6 +38,8 @@ EXPECTED_HEADERS = [
 
 REQUIRED_HEADERS = [
     "一级分组",
+    "二级分组",
+    "三级分组",
     "用例名称",
     "优先级",
     "创建人",
@@ -321,6 +323,12 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
     simple_operation_keywords_config = _difficulty_string_list(
         "simple_operation_keywords"
     )
+    simple_import_file_validation_keywords_config = _difficulty_string_list(
+        "simple_import_file_validation_keywords"
+    )
+    simple_import_template_download_keywords_config = _difficulty_string_list(
+        "simple_import_template_download_keywords"
+    )
 
     title_text = case.get("用例名称", "")
     description_text = case.get("用例描述", "")
@@ -422,6 +430,36 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
         reasons.append(f"命中复杂度信号：{'、'.join(complexity_signals)} +1")
 
     import_case = "导入" in normalized_combination_text
+
+    simple_import_file_validation_keywords = _matched_keywords(
+        normalized_title_text, simple_import_file_validation_keywords_config
+    )
+    if (
+        simple_import_file_validation_keywords
+        and verification_count <= 3
+        and precondition_count <= 3
+        and step_count <= 3
+        and set(complexity_signals).issubset({"导入"})
+    ):
+        return "简单", [
+            "导入文件级基础校验，"
+            f"命中简单导入文件校验信号：{'、'.join(simple_import_file_validation_keywords)}"
+        ]
+
+    simple_import_template_download_keywords = _matched_keywords(
+        normalized_title_text, simple_import_template_download_keywords_config
+    )
+    if (
+        simple_import_template_download_keywords
+        and verification_count <= 4
+        and precondition_count <= 3
+        and step_count <= 3
+        and set(complexity_signals).issubset({"导入"})
+    ):
+        return "简单", [
+            "导入模板下载低复杂度校验，"
+            f"命中简单导入模板下载信号：{'、'.join(simple_import_template_download_keywords)}"
+        ]
 
     simple_field_validation_keywords = _matched_keywords(
         normalized_title_text, simple_field_validation_keywords_config

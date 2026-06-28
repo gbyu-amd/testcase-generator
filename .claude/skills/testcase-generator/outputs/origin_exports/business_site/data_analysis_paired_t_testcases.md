@@ -5,6 +5,8 @@
 来源章节：配对T检验
 输入文件：
   - inputs/requirements/current_prd.md（最后修改：未知）
+  - inputs/ui_design/配对T检验/config.png（最后修改：未知）
+  - inputs/ui_design/配对T检验/result.png（最后修改：未知）
 参考模板：testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot_template.md
 生成假设：
   - 配对T检验分析方法可在监控项目和数据分析工作台中使用

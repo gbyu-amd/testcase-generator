@@ -57,22 +57,27 @@ testcase-generator/
    了解编写规范、该模块已有哪些场景
        │
        ▼
-④ AI 生成用例
-   按覆盖维度设计场景，附需求覆盖率对照表，
+④ AI 做生成前需求审查
+   对照 PRD、UI 图、知识库、规则和参考模板，
+   列出需求不明确、资料冲突、需求遗漏和规则不一致问题
+       │
+       ▼
+⑤ AI 生成用例
+   按覆盖维度设计场景，附需求问题清单、用例统计摘要和需求覆盖率对照表，
    保存为 Markdown
        │
        ▼
-⑤ 脚本校验（validate_cases.py）
+⑥ 脚本校验（validate_cases.py）
    检查字段完整性、预期结果质量、场景重复等
        │
       有 ERROR？── 是 ──▶ AI 修复 ──▶ 重新校验
        │ 否
        ▼
-⑥ 导出 Excel（export_testcases.py）
+⑦ 导出 Excel（export_testcases.py）
    生成带冻结表头、列宽、自动筛选的 .xlsx 文件
        │
        ▼
-⑦ 回复结果
+⑧ 回复结果
    文件路径、用例数量、覆盖模块、需求覆盖率
 ```
 
@@ -84,7 +89,7 @@ testcase-generator/
 
 **参考用例只读**：`testcase_templates/` 存放高质量范例，AI 只读不写，新生成内容一律写入 `outputs/origin_exports/public_site/` 或 `outputs/origin_exports/business_site/`，模板不被污染。
 
-**完整可追溯**：每条用例通过"分组 + 用例名称"定位，并在 `备注` 中记录具体来源，例如 `来源：prd`、`来源：UI图`、`来源：data_analysis_flow.md` 或 `来源：coverage_dimension_rules.md-合规追溯`；生成后附需求覆盖率对照表，支持从用例反查到对应的 PRD 需求。
+**完整可追溯**：每条用例通过"分组 + 用例名称"定位，并在 `备注` 中记录具体来源，例如 `来源：prd`、`来源：UI图`、`来源：data_analysis_flow.md` 或 `来源：coverage_dimension_rules.md-合规追溯`；生成后附需求问题清单、用例统计摘要和需求覆盖率对照表，直接依赖待确认项的用例名称前加 `【待确认】`。
 
 ## 适用场景
 
@@ -127,6 +132,8 @@ tangyao_prd.docx 里有哪些章节？
 Agent 会自动完成校验和导出，最终输出：
 - Markdown 用例文件：`outputs/origin_exports/<site_type>/<module_name>_testcases.md`
 - 分需求 Excel 文件：`outputs/excel_exports/<site_type>/<module_name>_testcases.xlsx`
+
+Markdown 用例文件包含元信息块、需求问题清单、用例统计摘要、标准 16 列用例表和需求覆盖率对照表。标准用例表中的 `一级分组`、`二级分组`、`三级分组` 均必须填写。若 PRD / UI 未明确具体字段、范围、格式、状态、影响对象或生效条件，且现有规则或测试团队既有判定口径无法给出可执行预期，会在需求问题清单中标记；直接依赖待确认项的用例名称前加 `【待确认】`。
 
 不带 `--source` 或传入目录批量导出时，脚本会生成 `测试用例导出_YYYYMMDD_HHMMSS.xlsx` 汇总文件；交付时默认按单个 Markdown 源文件分别导出同名 Excel。
 

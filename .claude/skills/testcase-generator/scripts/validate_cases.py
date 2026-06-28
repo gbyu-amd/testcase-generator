@@ -23,6 +23,10 @@
     - 生成用例的是否自动化、关联接口、用例测试类、关联项目是否留空
     - 测试场景是否重复
     - 操作步骤和预期结果是否过于空泛
+    - 用例步骤和预期结果是否包含“按...规则”等抽象不可验证表达
+    - 备注和元信息是否错误引用 outputs 下已生成用例作为来源
+    - UI 图来源与 UI 用例是否一致
+    - 展示类用例是否误标为正例、同一区域 UI 展示用例是否疑似重复拆分
 
 结果规则：
     - ERROR 表示必须修复，脚本退出码为 1。
@@ -84,6 +88,44 @@ VAGUE_EXPECTATION_PATTERNS = [
     re.compile(r"^成功[。.]?$"),
     re.compile(r"^通过[。.]?$"),
 ]
+
+FORBIDDEN_ABSTRACT_PATTERNS = [
+    (re.compile(r"按[^。；;\n]*规则"), "按...规则"),
+    (re.compile(r"根据[^。；;\n]*规则"), "根据...规则"),
+    (re.compile(r"符合[^。；;\n]*规则"), "符合...规则"),
+    (re.compile(r"按需求"), "按需求"),
+    (re.compile(r"对照\s*PRD", re.IGNORECASE), "对照 PRD"),
+    (re.compile(r"检查是否符合"), "检查是否符合"),
+]
+
+WEAK_EXPECTATION_PHRASE_RE = re.compile(
+    r"(显示正确|展示正确|展示完整|内容正确|数据正确|结果正确|页面正确)"
+)
+CONCRETE_EXPECTATION_CONTEXT_RE = re.compile(
+    r"(<br|\n|[、；;：:]|包含|提示|更新为|变为|不可|不生成|为空|"
+    r"回显|置灰|字段|列表|按钮|弹窗|名称|数值|文件|图表|过程数据|"
+    r"UCL|LCL|状态)"
+)
+
+OUTPUT_REFERENCE_RE = re.compile(r"(?:^|[\\/])outputs[\\/]|outputs[\\/]|_testcases\.md", re.IGNORECASE)
+
+UI_DISPLAY_SIGNAL_RE = re.compile(
+    r"(UI|页面|区域|布局|元素|按钮|文案|说明|标题|字段|列|列表|卡片|"
+    r"弹窗|页签|标签|默认值|展示|显示|回显|置灰)"
+)
+UI_DISPLAY_TITLE_RE = re.compile(
+    r"(UI校验|基础元素显示|元素显示|按钮展示|文案展示|布局展示|"
+    r"页面展示|区域展示|整体展示)"
+)
+BUSINESS_RESULT_SIGNAL_RE = re.compile(
+    r"(保存|提交|新增|编辑|删除|导入|导出|下载|上传|生成|创建|更新|"
+    r"推送|写入|生效|审批|确认|发布|退回|关闭|拦截|阻止|失败|成功|"
+    r"状态|记录|审计|计算|校验通过|校验失败|提示“|提示\")"
+)
+UI_REGION_SUFFIX_RE = re.compile(
+    r"(基础元素显示|元素显示|按钮展示|文案展示|布局展示|页面展示|区域展示|"
+    r"整体展示|UI校验|显示|展示|校验)$"
+)
 
 # 预期结果建议的最少字符数，过短通常说明缺少可验证的页面/数据/业务状态描述
 MIN_EXPECTATION_LENGTH = 10
@@ -167,6 +209,14 @@ CORE_FLOW_KEYWORDS = {
     ],
 }
 
+ONE_CLICK_REPAIR_INVALID_STATE_RE = re.compile(
+    r"(字段删减|字段缺失|字段不存在|字段匹配失败|字段未匹配|未匹配|匹配上定类变量|变量缺失|清空)"
+)
+ONE_CLICK_REPAIR_FIELD_RE = re.compile(r"(纵轴变量|横轴变量|子组大小|样本量字段|变量)")
+ONE_CLICK_REPAIR_FIELD_PRESERVED_RE = re.compile(
+    r"(字段仍保留|变量仍保留|仍保留在配置中|未被清空|未清空|没有清空)"
+)
+
 
 @dataclass
 class Issue:
@@ -190,6 +240,22 @@ def case_group(case: dict[str, str]) -> str:
         case.get("三级分组", ""),
     ]
     return " / ".join(group for group in groups if group) or "未分组"
+
+
+def case_text(case: dict[str, str]) -> str:
+    return "\n".join(
+        normalize_cell(case.get(field, ""))
+        for field in [
+            "一级分组",
+            "二级分组",
+            "三级分组",
+            "用例名称",
+            "前置条件",
+            "用例步骤",
+            "预期结果",
+            "备注",
+        ]
+    )
 
 
 def case_issue(
@@ -385,6 +451,65 @@ def invalid_source_attribution_reason(value: str) -> str:
     return ""
 
 
+def first_forbidden_abstract_expression(value: str) -> str:
+    normalized = normalize_cell(value)
+    for pattern, label in FORBIDDEN_ABSTRACT_PATTERNS:
+        if pattern.search(normalized):
+            return label
+    return ""
+
+
+def has_weak_contextless_expectation(value: str) -> bool:
+    normalized = normalize_cell(value)
+    return bool(
+        WEAK_EXPECTATION_PHRASE_RE.search(normalized)
+        and not CONCRETE_EXPECTATION_CONTEXT_RE.search(normalized)
+    )
+
+
+def is_ui_case(case: dict[str, str]) -> bool:
+    return (
+        normalize_cell(case.get("用例描述", "")).upper() == "UI"
+        or "UI校验" in case.get("用例名称", "")
+    )
+
+
+def is_display_only_candidate(case: dict[str, str]) -> bool:
+    name = normalize_cell(case.get("用例名称", ""))
+    expectation = normalize_cell(case.get("预期结果", ""))
+    display_signal = UI_DISPLAY_TITLE_RE.search(name)
+    business_signal = BUSINESS_RESULT_SIGNAL_RE.search(expectation)
+    return bool(display_signal and not business_signal)
+
+
+def ui_region_key(case: dict[str, str]) -> str:
+    name = normalize_cell(case.get("用例名称", ""))
+    name = name.replace(" ", "")
+    name = UI_REGION_SUFFIX_RE.sub("", name)
+    name = re.sub(r"[，,；;：:。.\-_/]+", "", name)
+    return name
+
+
+def is_generated_output_path(path: Path) -> bool:
+    try:
+        path.resolve().relative_to((project_root() / "outputs" / "origin_exports").resolve())
+        return True
+    except ValueError:
+        return False
+
+
+def file_metadata_block(path: Path) -> str:
+    text = read_text_file(path, encoding="utf-8-sig")
+    stripped = text.lstrip()
+    if stripped.startswith("<!--"):
+        end_index = stripped.find("-->")
+        if end_index != -1:
+            return stripped[: end_index + 3]
+
+    table_index = text.find("| 一级分组 |")
+    return text[:table_index] if table_index != -1 else ""
+
+
 def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
     issues: list[Issue] = []
 
@@ -423,6 +548,17 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     "用例步骤",
                 )
             )
+        forbidden_steps = first_forbidden_abstract_expression(steps)
+        if forbidden_steps:
+            issues.append(
+                case_issue(
+                    case,
+                    "ERROR",
+                    "abstract_step_expression",
+                    f"用例步骤包含不可直接执行的抽象表达：{forbidden_steps}，请改为具体页面、字段或操作对象",
+                    "用例步骤",
+                )
+            )
 
         remark = case["备注"]
         if requires_source_remark(case) and not has_valid_source_remark(remark):
@@ -444,6 +580,16 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                         "ERROR",
                         "invalid_source_attribution",
                         invalid_source_reason,
+                        "备注",
+                    )
+                )
+            if OUTPUT_REFERENCE_RE.search(remark):
+                issues.append(
+                    case_issue(
+                        case,
+                        "ERROR",
+                        "output_file_used_as_source",
+                        "备注不得引用 outputs 下已生成用例或 *_testcases.md 作为来源；参考用例只能来自 testcase_templates 下模板文件",
                         "备注",
                     )
                 )
@@ -500,7 +646,29 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                 )
             )
 
+        if not is_ui_case(case) and is_display_only_candidate(case):
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "ui_case_misclassified",
+                    "该用例主要验证页面元素、按钮、文案或布局展示，建议改为 UI 用例并在名称中包含 UI校验；若同一区域已有 UI校验 用例，应合并去重",
+                    "用例描述",
+                )
+            )
+
         expectation = case["预期结果"]
+        forbidden_expectation = first_forbidden_abstract_expression(expectation)
+        if forbidden_expectation:
+            issues.append(
+                case_issue(
+                    case,
+                    "ERROR",
+                    "abstract_expectation_expression",
+                    f"预期结果包含抽象不可验证表达：{forbidden_expectation}，请直接写最终可观察结果",
+                    "预期结果",
+                )
+            )
         if expectation and is_vague_expectation(expectation):
             issues.append(
                 case_issue(
@@ -508,6 +676,16 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     "ERROR",
                     "vague_expectation",
                     f"预期结果过于空泛：{expectation}",
+                    "预期结果",
+                )
+            )
+        elif expectation and has_weak_contextless_expectation(expectation):
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "weak_expectation_context",
+                    f"预期结果包含“显示正确/展示完整”等弱表达，建议列出具体字段、状态、页面元素或数据变化：{expectation}",
                     "预期结果",
                 )
             )
@@ -525,6 +703,105 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
     return issues
 
 
+def validate_ui_case_deduplication(cases: list[dict[str, str]]) -> list[Issue]:
+    issues: list[Issue] = []
+    ui_cases_by_scope: dict[tuple[str, str, str], list[dict[str, str]]] = {}
+
+    for case in cases:
+        key = ui_region_key(case)
+        if not key or not is_ui_case(case):
+            continue
+        ui_cases_by_scope.setdefault(
+            (case.get("_source_file", ""), case_group(case), key), []
+        ).append(case)
+
+    for case in cases:
+        if is_ui_case(case) or not is_display_only_candidate(case):
+            continue
+        key = ui_region_key(case)
+        matched_ui_cases = ui_cases_by_scope.get(
+            (case.get("_source_file", ""), case_group(case), key), []
+        )
+        if not matched_ui_cases:
+            continue
+        matched_names = "、".join(
+            matched_case["用例名称"] for matched_case in matched_ui_cases
+        )
+        issues.append(
+            case_issue(
+                case,
+                "WARN",
+                "ui_case_duplicate_split",
+                f"同一分组下已存在相同页面区域的 UI校验 用例：{matched_names}；建议把本用例的展示校验项合并到 UI 用例中",
+                "用例名称",
+            )
+        )
+
+    return issues
+
+
+def validate_file_sources(case_files: list[Path], cases: list[dict[str, str]]) -> list[Issue]:
+    issues: list[Issue] = []
+    cases_by_file: dict[str, list[dict[str, str]]] = {}
+    for case in cases:
+        cases_by_file.setdefault(case.get("_source_file", ""), []).append(case)
+
+    for case_file in case_files:
+        if not is_generated_output_path(case_file):
+            continue
+
+        metadata = file_metadata_block(case_file)
+        normalized_metadata = metadata.replace("\\", "/")
+        if OUTPUT_REFERENCE_RE.search(normalized_metadata):
+            issues.append(
+                Issue(
+                    severity="ERROR",
+                    code="output_file_used_as_input_source",
+                    message=(
+                        "元信息输入文件不得引用 outputs 下已生成用例或 *_testcases.md；"
+                        "参考用例只能来自 testcase_templates 下模板文件"
+                    ),
+                    file=str(case_file),
+                )
+            )
+
+        file_cases = cases_by_file.get(str(case_file), [])
+        has_ui_source = bool(
+            re.search(
+                r"inputs/ui_design/.*\.(?:png|jpg|jpeg|webp|gif)",
+                normalized_metadata,
+                re.IGNORECASE,
+            )
+        )
+        has_ui_remark = any("UI图" in case.get("备注", "") for case in file_cases)
+        has_ui_case = any(
+            normalize_cell(case.get("用例描述", "")).upper() == "UI"
+            or "UI校验" in case.get("用例名称", "")
+            for case in file_cases
+        )
+
+        if has_ui_remark and not has_ui_source:
+            issues.append(
+                Issue(
+                    severity="ERROR",
+                    code="ui_source_missing_in_metadata",
+                    message="用例备注引用了 UI图，但文件元信息输入文件未列出 inputs/ui_design 下的图片",
+                    file=str(case_file),
+                )
+            )
+        if has_ui_source and not has_ui_case:
+            issues.append(
+                Issue(
+                    severity="WARN",
+                    code="ui_source_without_ui_case",
+                    message="文件元信息包含 UI 图，但未发现用例描述为 UI 或用例名称包含 UI校验 的用例",
+                    file=str(case_file),
+                )
+            )
+
+    return issues
+
+
 def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
     """CPV 核心业务模块应覆盖约定的关键场景关键词，缺失时给出 WARN。"""
     issues: list[Issue] = []
@@ -534,6 +811,12 @@ def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
         if not any(module in present for present in modules_present):
             continue
         module_cases = [case for case in cases if module in case_group(case)]
+        if module == "报告编制":
+            module_cases = [
+                case for case in module_cases if "影响范围" not in case_group(case)
+            ]
+            if not module_cases:
+                continue
         scoped_keyword_groups = keyword_groups
         if module == "报告编制" and module_cases and all(
             "导出" in case_group(case) for case in module_cases
@@ -556,6 +839,95 @@ def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
                     "WARN",
                     "core_flow_coverage_gap",
                     f"核心链路模块“{module}”疑似缺少关键场景覆盖：{'、'.join(missing_groups)}",
+                )
+            )
+
+    return issues
+
+
+def validate_data_analysis_one_click_rules(cases: list[dict[str, str]]) -> list[Issue]:
+    """校验数据分析一键分析专项规则中容易漏掉或误判的语义场景。"""
+    issues: list[Issue] = []
+    cases_by_file: dict[str, list[dict[str, str]]] = {}
+    for case in cases:
+        cases_by_file.setdefault(case.get("_source_file", ""), []).append(case)
+
+    for case in cases:
+        group = case_group(case)
+        name = normalize_cell(case.get("用例名称", ""))
+        if "一键分析" not in group and "一键分析" not in name:
+            continue
+
+        text = case_text(case)
+        if "修复后" in name and "成功" in name and "一键分析成功" not in name:
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "one_click_repair_name_missing_success",
+                    "一键分析修复成功类用例名称必须明确包含“一键分析成功”，不得只写“修复后成功”",
+                    "用例名称",
+                )
+            )
+
+        is_repair_success = "修复后" in name and "一键分析成功" in name
+        invalid_field_state = ONE_CLICK_REPAIR_INVALID_STATE_RE.search(text)
+        affected_field = ONE_CLICK_REPAIR_FIELD_RE.search(text)
+        field_preserved = ONE_CLICK_REPAIR_FIELD_PRESERVED_RE.search(text)
+        if is_repair_success and invalid_field_state and affected_field and not field_preserved:
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "one_click_invalid_cleared_field_repair",
+                    "字段删减、字段缺失、字段未匹配、匹配上定类变量或变量已清空时，不能生成一键分析修复成功用例；应改为未分析/需手动配置类用例",
+                    "用例名称",
+                )
+            )
+
+    for source_file, file_cases in cases_by_file.items():
+        one_click_cases = [
+            case
+            for case in file_cases
+            if "一键分析" in case_group(case)
+            or "一键分析" in normalize_cell(case.get("用例名称", ""))
+        ]
+        if not one_click_cases:
+            continue
+
+        file_text = "\n".join(case_text(case) for case in file_cases)
+        one_click_names = "\n".join(
+            normalize_cell(case.get("用例名称", "")) for case in one_click_cases
+        )
+
+        if (
+            "字段删减" in file_text
+            and "控制图" in file_text
+            and not any("字段删减" in case_group(case) for case in one_click_cases)
+        ):
+            issues.append(
+                Issue(
+                    severity="WARN",
+                    code="one_click_missing_field_deletion_case",
+                    message="控制图一键分析已出现字段删减风险，但缺少三级分组为“字段删减”的独立用例",
+                    file=source_file,
+                )
+            )
+
+        has_non_integer_failure = (
+            "纵轴变量不包含整数时一键分析未分析" in one_click_names
+            or ("纵轴变量不包含整数" in one_click_names and "一键分析未分析" in one_click_names)
+        )
+        has_non_integer_repair = (
+            "纵轴变量不包含整数修复后一键分析成功" in one_click_names
+        )
+        if has_non_integer_failure and not has_non_integer_repair:
+            issues.append(
+                Issue(
+                    severity="WARN",
+                    code="one_click_missing_non_integer_repair_case",
+                    message="存在“纵轴变量不包含整数”的一键分析未分析用例，但缺少“纵轴变量不包含整数修复后一键分析成功”用例",
+                    file=source_file,
                 )
             )
 
@@ -756,8 +1128,11 @@ def main(argv: list[str]) -> int:
         return 1
 
     issues.extend(validate_case_rows(cases))
+    issues.extend(validate_ui_case_deduplication(cases))
+    issues.extend(validate_file_sources(case_files, cases))
     issues.extend(validate_duplicates(cases))
     issues.extend(validate_core_flow_coverage(cases))
+    issues.extend(validate_data_analysis_one_click_rules(cases))
 
     if args.json:
         print_json_report(case_files, cases, issues, fixes)
