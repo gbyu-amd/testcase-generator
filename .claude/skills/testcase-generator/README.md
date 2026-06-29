@@ -185,6 +185,9 @@ python scripts/validate_cases.py --source outputs/origin_exports/<site_type>/<mo
 # 导出 Excel（校验通过后执行）
 python scripts/export_testcases.py --source outputs/origin_exports/<site_type>/<module_name>_testcases.md
 
+# 推荐：一次完成校验、导出 Excel 并回填实际生成耗时
+python scripts/export_testcases.py --source outputs/origin_exports/<site_type>/<module_name>_testcases.md --started-at
+
 # 导出并清理历史 xlsx，仅保留本次文件
 python scripts/export_testcases.py --source outputs/origin_exports/<site_type>/<module_name>_testcases.md --clean
 

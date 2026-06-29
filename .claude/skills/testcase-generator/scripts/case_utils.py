@@ -78,7 +78,7 @@ def is_under(path: Path, root: Path) -> bool:
 def ensure_under(path: Path, root: Path, label: str) -> Path:
     resolved = path.resolve()
     if not is_under(resolved, root):
-        raise ValueError(f"{label} 必须位于项目目录内：{root}")
+        raise ValueError(f"{label} 必须位于以下目录内：{root}")
     return resolved
 
 
@@ -224,9 +224,16 @@ def _matched_combinations(
     ]
 
 
-def is_ui_case(description: str) -> bool:
-    """判断是否为 UI 展示类用例。"""
-    return normalize_cell(description).upper() == "UI"
+def is_ui_case(case: dict[str, str]) -> bool:
+    """判断是否为 UI 展示类用例：描述为 UI，或用例名称包含"UI校验"。
+
+    判定口径与 validate_cases.is_ui_case 保持一致，避免难度推断和校验
+    规则对同一用例给出冲突结论。
+    """
+    return (
+        normalize_cell(case.get("用例描述", "")).upper() == "UI"
+        or "UI校验" in case.get("用例名称", "")
+    )
 
 
 DIFFICULTY_RULE_BLOCK_RE = re.compile(
@@ -335,7 +342,7 @@ def infer_case_difficulty_with_reason(case: dict[str, str]) -> tuple[str, list[s
     precondition_text = case.get("前置条件", "")
     step_text = case.get("用例步骤", "")
     expectation_text = case.get("预期结果", "")
-    ui_case = is_ui_case(description_text)
+    ui_case = is_ui_case(case)
 
     normalized_title_text = _normalize_keyword_text(title_text)
     normalized_step_expectation_text = _normalize_keyword_text(step_text, expectation_text)

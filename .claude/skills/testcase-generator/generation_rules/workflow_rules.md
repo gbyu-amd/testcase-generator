@@ -55,6 +55,7 @@ UI 设计图、页面截图或原型图按章节名组织在 `inputs/ui_design/<
 - 第三方软件、测试团队既有对比口径或业务确认值可作为测试判定依据时，不得仅因 PRD 未展开算法公式或过程计算细节而写入需求问题清单。
 - 影响业务结论、字段范围、状态流转或预期结果是否成立的 PRD / UI 缺口，写入需求问题清单，并将直接依赖该结论的用例标记 `【待确认】`。
 - 仅影响专项默认覆盖项是否适用、是否需要补充的内容，写入需求覆盖率对照表的回查记录；不直接生成需求问题。
+- UI 设计图缺失、UI 图未提供或未匹配到同名目录，**不属于需求问题**，不得写入需求问题清单；仅在元信息块的"生成假设"中说明，并在需求覆盖率对照表记录"UI 图补充后再细化"等回查项。
 
 新建、覆盖或另存文件时，在元信息块后、测试用例表前写入“需求问题清单”。没有发现问题时写“本次审查未发现需求问题”。
 
@@ -286,13 +287,13 @@ python scripts/validate_cases.py --source outputs/origin_exports/<site_type>/<mo
 - `validate_cases.py --fix` 只能修复 Markdown 表格格式，不得用于绕过业务语义问题。
 - 难度标签 WARN 不阻断默认导出；如果要求 Markdown 源文件 0 WARN，必须根据 WARN 明细修复源文件。
 
-推荐使用 `finalize_testcase_output.py` 一次完成单文件校验、Excel 导出和 `生成耗时` 回填：
+推荐使用 `export_testcases.py --started-at` 一次完成单文件校验、Excel 导出和 `生成耗时` 回填：
 
 ```bash
-python scripts/finalize_testcase_output.py --source outputs/origin_exports/<site_type>/<module_name>_testcases.md --started-at "YYYY-MM-DD HH:MM:SS"
+python scripts/export_testcases.py --source outputs/origin_exports/<site_type>/<module_name>_testcases.md --started-at
 ```
 
-`--started-at` 使用开始读取资料前记录的时间。该脚本会先运行 `validate_cases.py --json`；存在 ERROR 时停止，不导出 Excel，不回填耗时；校验通过后调用 `export_testcases.py --source`；Excel 导出成功后回填实际耗时。若只替换 `生成耗时` 且回填前已经 0 ERROR / 0 WARN，脚本会跳过二次校验。
+`--started-at` 不带值时（推荐）自动从元信息块的"生成时间"行读取起点；元信息块的"生成时间"必须落盘为真实的开始读取资料时刻，不得瞎编。也可显式传入 Unix 秒级时间戳、`YYYY-MM-DD HH:MM` 或 `YYYY-MM-DD HH:MM:SS`。脚本会先完整校验用例（在 ERROR 时停止导出，`--strict` 下 WARN 也会停）；Excel 导出成功后回填实际耗时到 Markdown。回填只修改元信息中的"生成耗时"那一行，不触碰任何用例表格字段，因此不再二次校验。
 
 如需手动执行，校验通过后按单文件导出分需求 Excel：
 
@@ -308,4 +309,4 @@ outputs/excel_exports/<site_type>/<module_name>_testcases.xlsx
 
 不带 `--source` 或传入目录会生成 `测试用例导出_YYYYMMDD_HHMMSS.xlsx` 汇总文件，仅适合临时汇总，不作为默认交付方式。
 
-Excel 导出完成后必须回到对应 Markdown 文件，更新元信息或追加记录中的 `生成耗时` 为实际耗时。若本次回填只替换 `生成耗时` 字段，且回填前该 Markdown 已经通过 `validate_cases.py --source <Markdown路径>` 并达到 0 ERROR / 0 WARN，可不再重复运行校验；若同时修改了用例表、统计摘要、需求问题清单、需求覆盖率对照表或其他正文内容，必须重新运行 `validate_cases.py --source <Markdown路径>`。最终回复用户前，确认 Markdown 中不存在 `生成耗时：待回填`、预计耗时或仍带 `约` 的耗时描述。优先使用 `finalize_testcase_output.py` 自动完成本段要求，减少手工回填和重复校验耗时。
+Excel 导出完成后必须回到对应 Markdown 文件，更新元信息或追加记录中的 `生成耗时` 为实际耗时。若本次回填只替换 `生成耗时` 字段，且回填前该 Markdown 已经通过 `validate_cases.py --source <Markdown路径>` 并达到 0 ERROR / 0 WARN，可不再重复运行校验；若同时修改了用例表、统计摘要、需求问题清单、需求覆盖率对照表或其他正文内容，必须重新运行 `validate_cases.py --source <Markdown路径>`。最终回复用户前，确认 Markdown 中不存在 `生成耗时：待回填`、预计耗时或仍带 `约` 的耗时描述。优先使用 `export_testcases.py --source <Markdown路径> --started-at` 自动完成本段要求，减少手工回填和重复校验耗时。

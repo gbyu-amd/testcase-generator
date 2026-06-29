@@ -17,6 +17,10 @@
     - 未指定 --output 时，按 public_site / business_site 分类输出。
     - 导出前自动执行完整校验；存在 ERROR 时停止导出。
     - 使用 --strict 在存在 ERROR 或 WARN 时都停止导出。
+    - 使用 --started-at 在单文件导出成功后回填 Markdown 中的"生成耗时"行；
+      回填只改元信息那一行，不触碰用例表格，因此不再二次校验。
+    - `--started-at`（不带值，推荐）从元信息块的"生成时间"行自动读取起点，
+      保证两个字段同源，避免手传错值；也可显式传入时间。
 
 导出前校验：
     复用 validate_cases.py 的完整校验规则，避免校验失败的用例被导出。
@@ -25,6 +29,8 @@
     python scripts/export_testcases.py
     python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md
     python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md --strict -o data_analysis_testcases.xlsx
+    python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md --started-at
+    python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md --started-at "2026-06-29 13:50:00"
 
 本脚本只使用 Python 标准库，不需要额外安装依赖。
 """
@@ -48,7 +54,9 @@ from case_utils import (
     ensure_under,
     parse_case_file,
     project_root,
+    read_text_file,
     windows_long_path,
+    write_text_file,
 )
 from validate_cases import (
     format_issue,
@@ -57,6 +65,7 @@ from validate_cases import (
     validate_case_rows,
     validate_core_flow_coverage,
     validate_data_analysis_one_click_rules,
+    validate_duration_metadata,
     validate_duplicates,
     validate_file_sources,
     validate_ui_case_deduplication,
@@ -69,6 +78,33 @@ _STYLE_HEADER = 1    # 表头：加粗、绿色背景、居中
 _STYLE_DATA = 2      # 数据行：带边框、顶部对齐、自动换行
 SITE_TYPES = ("public_site", "business_site")
 GROUP_HEADERS = ("一级分组", "二级分组", "三级分组")
+
+DURATION_LINE_RE = re.compile(r"^(生成耗时：).*$", re.MULTILINE)
+DURATION_PLACEHOLDER_RE = re.compile(r"生成耗时：(?:待回填|约|预计)")
+GENERATION_TIME_RE = re.compile(
+    r"^生成时间：(\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(?::\d{2})?)",
+    re.MULTILINE,
+)
+
+# 每列固定列宽，按表头名映射，便于 EXPECTED_HEADERS 增删时立即暴露遗漏
+COLUMN_WIDTH_BY_HEADER = {
+    "一级分组": 16,
+    "二级分组": 16,
+    "三级分组": 16,
+    "用例名称": 36,
+    "优先级": 10,
+    "创建人": 12,
+    "用例描述": 16,
+    "前置条件": 36,
+    "用例步骤": 48,
+    "预期结果": 52,
+    "备注": 24,
+    "用例标签": 18,
+    "是否自动化": 14,
+    "关联接口": 24,
+    "用例测试类": 18,
+    "关联项目": 18,
+}
 
 
 def column_name(index: int) -> str:
@@ -130,7 +166,7 @@ def worksheet_xml(headers: list[str], cases: list[dict[str, str]]) -> str:
         values, previous_groups = display_values_for_excel(headers, case, previous_groups)
         rows.append(row_xml(row_index, values, _STYLE_DATA))
 
-    column_widths = [16, 16, 16, 36, 10, 12, 16, 36, 48, 52, 24, 18, 14, 24, 18, 18]
+    column_widths = [COLUMN_WIDTH_BY_HEADER[header] for header in headers]
     cols = "".join(
         f'<col min="{index}" max="{index}" width="{width}" customWidth="1"/>'
         for index, width in enumerate(column_widths, start=1)
@@ -276,6 +312,87 @@ def group_case_files_by_site(
     return groups
 
 
+def parse_started_at(value: str) -> datetime | str:
+    # argparse 对 nargs="?" 的 const 也会经过 type 转换，需放行 "auto" sentinel
+    if value == "auto":
+        return "auto"
+    text = value.strip()
+    if text.isdigit():
+        try:
+            return datetime.fromtimestamp(int(text))
+        except (ValueError, OSError) as error:
+            raise argparse.ArgumentTypeError(f"无效的 Unix 时间戳：{text}（{error}）") from error
+
+    normalized = text.replace("T", " ")
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(normalized, fmt)
+        except ValueError:
+            pass
+
+    raise argparse.ArgumentTypeError(
+        "开始时间格式必须为 Unix 秒级时间戳、YYYY-MM-DD HH:MM 或 YYYY-MM-DD HH:MM:SS"
+    )
+
+
+def format_duration(started_at: datetime, ended_at: datetime) -> str:
+    elapsed_seconds = max(0, int((ended_at - started_at).total_seconds()))
+    minutes, seconds = divmod(elapsed_seconds, 60)
+    if minutes == 0:
+        return f"{seconds} 秒"
+    if seconds == 0:
+        return f"{minutes} 分钟"
+    return f"{minutes} 分 {seconds} 秒"
+
+
+def _count_table_lines(content: str) -> int:
+    return sum(1 for line in content.splitlines() if line.lstrip().startswith("|"))
+
+
+def backfill_duration(source: Path, duration_text: str) -> bool:
+    """回填"生成耗时"行；通过对比表格行数防止意外破坏用例表。
+
+    回填只修改元信息块中"生成耗时"那一行，不触碰任何用例表格字段，
+    因此无需重新运行 validate_cases.py。
+    """
+    content = read_text_file(source)
+    replacement = f"生成耗时：{duration_text}（从开始读取资料到校验和 Excel 导出完成）"
+
+    if not DURATION_LINE_RE.search(content):
+        raise RuntimeError("未找到“生成耗时：”元信息行，无法回填耗时")
+
+    table_lines_before = _count_table_lines(content)
+    updated = DURATION_LINE_RE.sub(replacement, content, count=1)
+    table_lines_after = _count_table_lines(updated)
+
+    if table_lines_before != table_lines_after:
+        raise RuntimeError("回填耗时后用例表格行数发生变化，已拒绝写入，请检查源文件")
+
+    if updated == content:
+        return False
+
+    write_text_file(source, updated)
+    return True
+
+
+def ensure_no_duration_placeholder(source: Path) -> None:
+    content = read_text_file(source)
+    if DURATION_PLACEHOLDER_RE.search(content):
+        raise RuntimeError("Markdown 中仍存在待回填、约或预计耗时，请检查生成耗时元信息")
+
+
+def read_started_at_from_metadata(source: Path) -> datetime:
+    """从元信息块的"生成时间"行读取起点，保证与标签字段同源，避免手传错值。"""
+    content = read_text_file(source)
+    match = GENERATION_TIME_RE.search(content)
+    if not match:
+        raise RuntimeError(
+            "元信息中找不到 “生成时间：YYYY-MM-DD HH:MM[:SS]” 行，"
+            "无法自动推断 --started-at；请改用 --started-at \"<时间>\" 显式传入"
+        )
+    return parse_started_at(match.group(1))
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     root = project_root()
     parser = argparse.ArgumentParser(
@@ -303,6 +420,20 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         "--clean",
         action="store_true",
         help="导出成功后仅清理本次输出目录下的临时汇总 Excel：测试用例导出_*.xlsx",
+    )
+    parser.add_argument(
+        "--started-at",
+        nargs="?",
+        const="auto",
+        default=None,
+        type=parse_started_at,
+        help=(
+            "可选，触发导出成功后回填 Markdown 中的“生成耗时”行。"
+            "不接值时（推荐，即 --started-at）从元信息块的“生成时间”行自动读取起点，"
+            "保证两个字段同源，避免手传错值；"
+            "也可显式传入 Unix 秒级时间戳、YYYY-MM-DD HH:MM 或 YYYY-MM-DD HH:MM:SS。"
+            "仅在 --source 指向单个 Markdown 文件时可用"
+        ),
     )
     return parser.parse_args(argv)
 
@@ -358,6 +489,43 @@ def main(argv: list[str]) -> int:
         print("导出失败：未找到任何测试用例 Markdown 文件", file=sys.stderr)
         return 1
 
+    if args.started_at is not None and len(case_files) != 1:
+        print(
+            "导出失败：--started-at 仅在 --source 指向单个 Markdown 文件时可用",
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.started_at is not None:
+        target = case_files[0]
+        try:
+            target.resolve().relative_to(origin_dir.resolve())
+        except ValueError:
+            print(
+                "导出失败：--started-at 仅允许回填 outputs/origin_exports/ 下的 Markdown 文件，"
+                "不得用于 testcase_templates 等只读目录",
+                file=sys.stderr,
+            )
+            return 1
+        if not DURATION_LINE_RE.search(read_text_file(target)):
+            print(
+                "导出失败：--started-at 找不到元信息中的“生成耗时：”行，"
+                "请确认 Markdown 是按 SKILL.md 模板生成的",
+                file=sys.stderr,
+            )
+            return 1
+
+    # 解析实际起点：auto 模式从元信息块的"生成时间"行读，显式值直接用
+    started_at_resolved: datetime | None = None
+    if args.started_at == "auto":
+        try:
+            started_at_resolved = read_started_at_from_metadata(case_files[0])
+        except (RuntimeError, argparse.ArgumentTypeError) as error:
+            print(f"导出失败：{error}", file=sys.stderr)
+            return 1
+    elif args.started_at is not None:
+        started_at_resolved = args.started_at
+
     groups = group_case_files_by_site(case_files, origin_dir)
     if args.output:
         if len(case_files) != 1:
@@ -410,6 +578,7 @@ def main(argv: list[str]) -> int:
         validation_issues.extend(validate_duplicates(cases))
         validation_issues.extend(validate_core_flow_coverage(cases))
         validation_issues.extend(validate_data_analysis_one_click_rules(cases))
+        validation_issues.extend(validate_duration_metadata(group_files))
 
         if validation_issues:
             print(f"导出前校验结果（{group_name}）：")
@@ -466,6 +635,17 @@ def main(argv: list[str]) -> int:
 
     if exported_count > 1:
         print(f"共导出 {exported_count} 个 Excel 文件。")
+
+    if started_at_resolved is not None:
+        duration_text = format_duration(started_at_resolved, datetime.now())
+        try:
+            backfill_duration(case_files[0], duration_text)
+            ensure_no_duration_placeholder(case_files[0])
+        except RuntimeError as error:
+            print(f"回填耗时失败：{error}", file=sys.stderr)
+            return 1
+        print(f"已回填生成耗时：{duration_text}")
+
     return 0
 
 

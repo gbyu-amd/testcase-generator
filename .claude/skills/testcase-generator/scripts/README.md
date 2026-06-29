@@ -111,6 +111,14 @@ python scripts/export_testcases.py --source outputs/origin_exports/business_site
 
 `--clean` 只清理本次输出目录下的临时汇总 Excel（`测试用例导出_*.xlsx`），不会删除分需求交付文件。
 
+### 一次完成导出并回填生成耗时（推荐）
+
+```bash
+python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_paired_t_testcases.md --started-at
+```
+
+`--started-at` 不带值时（推荐）从元信息块的"生成时间"行自动读取起点，保证两个字段同源，避免手传错值；元信息块的"生成时间"必须落盘为真实的开始读取资料时刻，不得瞎编。也可显式传入 Unix 秒级时间戳、`YYYY-MM-DD HH:MM` 或 `YYYY-MM-DD HH:MM:SS`。脚本会先完整校验，导出 Excel 成功后回填 Markdown 元信息中的"生成耗时"行。回填只修改那一行，不触碰用例表格，因此不再二次校验。仅在 `--source` 指向单个 Markdown 文件时可用，且文件必须位于 `outputs/origin_exports/` 下。
+
 ### 启用严格校验
 
 ```bash

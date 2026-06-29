@@ -156,6 +156,9 @@ INVALID_SOURCE_ATTRIBUTION_PATTERNS = [
 ]
 EMPTY_GENERATED_HEADERS = ["是否自动化", "关联接口", "用例测试类", "关联项目"]
 
+# 生成耗时占位词：交付前必须按实际耗时回填
+DURATION_PLACEHOLDER_RE = re.compile(r"生成耗时：(?:待回填|约|预计)")
+
 # CPV 核心业务模块需要覆盖的关键场景关键词（任一同义词命中即算覆盖）
 CORE_FLOW_KEYWORDS = {
     "年度计划": [
@@ -802,24 +805,32 @@ def validate_file_sources(case_files: list[Path], cases: list[dict[str, str]]) -
     return issues
 
 
+def _case_module_set(case: dict[str, str]) -> set[str]:
+    """业务模块名匹配一级/二级分组（避免子串误命中三级分组里的同名词）。"""
+    return {case.get("一级分组", ""), case.get("二级分组", "")}
+
+
 def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
     """CPV 核心业务模块应覆盖约定的关键场景关键词，缺失时给出 WARN。"""
     issues: list[Issue] = []
-    modules_present = {case_group(case) for case in cases if case_group(case)}
+    modules_present: set[str] = set()
+    for case in cases:
+        modules_present |= _case_module_set(case)
+    modules_present.discard("")
 
     for module, keyword_groups in CORE_FLOW_KEYWORDS.items():
-        if not any(module in present for present in modules_present):
+        if module not in modules_present:
             continue
-        module_cases = [case for case in cases if module in case_group(case)]
+        module_cases = [case for case in cases if module in _case_module_set(case)]
         if module == "报告编制":
             module_cases = [
-                case for case in module_cases if "影响范围" not in case_group(case)
+                case for case in module_cases if "影响范围" not in case.get("三级分组", "")
             ]
             if not module_cases:
                 continue
         scoped_keyword_groups = keyword_groups
         if module == "报告编制" and module_cases and all(
-            "导出" in case_group(case) for case in module_cases
+            "导出" in case.get("三级分组", "") for case in module_cases
         ):
             scoped_keyword_groups = [
                 groups for groups in keyword_groups if groups[0] not in {"审批", "生效"}
@@ -842,6 +853,28 @@ def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
                 )
             )
 
+    return issues
+
+
+def validate_duration_metadata(case_files: list[Path]) -> list[Issue]:
+    """最终交付前，"生成耗时"不得保留 待回填/约/预计 占位词。"""
+    issues: list[Issue] = []
+    for case_file in case_files:
+        if not is_generated_output_path(case_file):
+            continue
+        try:
+            metadata = file_metadata_block(case_file)
+        except OSError:
+            continue
+        if DURATION_PLACEHOLDER_RE.search(metadata):
+            issues.append(
+                Issue(
+                    severity="WARN",
+                    code="duration_placeholder_remaining",
+                    message="“生成耗时”仍为待回填/约/预计，导出前必须按实际耗时回填",
+                    file=str(case_file),
+                )
+            )
     return issues
 
 
@@ -1133,6 +1166,7 @@ def main(argv: list[str]) -> int:
     issues.extend(validate_duplicates(cases))
     issues.extend(validate_core_flow_coverage(cases))
     issues.extend(validate_data_analysis_one_click_rules(cases))
+    issues.extend(validate_duration_metadata(case_files))
 
     if args.json:
         print_json_report(case_files, cases, issues, fixes)

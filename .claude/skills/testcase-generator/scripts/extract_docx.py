@@ -113,8 +113,6 @@ def read_docx_blocks(docx_path: Path) -> list[DocBlock]:
             if paragraph is None:
                 continue
             text = _paragraph_text(paragraph)
-            if not text and _has_inline_image(paragraph):
-                continue
             if not text:
                 continue
 
