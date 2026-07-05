@@ -52,6 +52,9 @@ from case_utils import (
     configure_output_encoding,
     discover_case_files,
     ensure_under,
+    expected_headers_for,
+    group_headers_for_count,
+    group_headers_from_case,
     parse_case_file,
     project_root,
     read_text_file,
@@ -77,7 +80,6 @@ INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 _STYLE_HEADER = 1    # 表头：加粗、绿色背景、居中
 _STYLE_DATA = 2      # 数据行：带边框、顶部对齐、自动换行
 SITE_TYPES = ("public_site", "business_site")
-GROUP_HEADERS = ("一级分组", "二级分组", "三级分组")
 
 DURATION_LINE_RE = re.compile(r"^(生成耗时：).*$", re.MULTILINE)
 DURATION_PLACEHOLDER_RE = re.compile(r"生成耗时：(?:待回填|约|预计)")
@@ -86,7 +88,8 @@ GENERATION_TIME_RE = re.compile(
     re.MULTILINE,
 )
 
-# 每列固定列宽，按表头名映射，便于 EXPECTED_HEADERS 增删时立即暴露遗漏
+# 每列固定列宽；动态分组列未显式配置时使用 GROUP_COLUMN_WIDTH
+GROUP_COLUMN_WIDTH = 16
 COLUMN_WIDTH_BY_HEADER = {
     "一级分组": 16,
     "二级分组": 16,
@@ -138,17 +141,27 @@ def row_xml(row_index: int, values: list[str], style_index: int) -> str:
     return f'<row r="{row_index}" ht="{height}" customHeight="1">{"".join(cells)}</row>'
 
 
+def headers_for_cases(cases: list[dict[str, str]]) -> list[str]:
+    max_group_count = max(
+        (len(group_headers_from_case(case)) for case in cases),
+        default=3,
+    )
+    group_headers = group_headers_for_count(max_group_count)
+    return expected_headers_for(group_headers)
+
+
 def display_values_for_excel(
-    headers: list[str], case: dict[str, str], previous_groups: tuple[str, str, str] | None
-) -> tuple[list[str], tuple[str, str, str]]:
+    headers: list[str], case: dict[str, str], previous_groups: tuple[str, ...] | None
+) -> tuple[list[str], tuple[str, ...]]:
     """Blank repeated group names to make the exported sheet easier to scan."""
-    current_groups = tuple(case.get(header, "") for header in GROUP_HEADERS)
+    group_headers = group_headers_from_case(case)
+    current_groups = tuple(case.get(header, "") for header in group_headers)
     values: list[str] = []
 
     for header in headers:
-        value = case[header]
-        if header in GROUP_HEADERS and previous_groups is not None:
-            group_index = GROUP_HEADERS.index(header)
+        value = case.get(header, "")
+        if header in group_headers and previous_groups is not None:
+            group_index = group_headers.index(header)
             if current_groups[: group_index + 1] == previous_groups[: group_index + 1]:
                 value = ""
         values.append(value)
@@ -161,12 +174,14 @@ def worksheet_xml(headers: list[str], cases: list[dict[str, str]]) -> str:
     max_col = len(headers)
     dimension = f"A1:{column_name(max_col)}{max_row}"
     rows = [row_xml(1, headers, _STYLE_HEADER)]
-    previous_groups: tuple[str, str, str] | None = None
+    previous_groups: tuple[str, ...] | None = None
     for row_index, case in enumerate(cases, start=2):
         values, previous_groups = display_values_for_excel(headers, case, previous_groups)
         rows.append(row_xml(row_index, values, _STYLE_DATA))
 
-    column_widths = [COLUMN_WIDTH_BY_HEADER[header] for header in headers]
+    column_widths = [
+        COLUMN_WIDTH_BY_HEADER.get(header, GROUP_COLUMN_WIDTH) for header in headers
+    ]
     cols = "".join(
         f'<col min="{index}" max="{index}" width="{width}" customWidth="1"/>'
         for index, width in enumerate(column_widths, start=1)
@@ -224,6 +239,7 @@ def styles_xml() -> str:
 
 
 def write_xlsx(output_path: Path, cases: list[dict[str, str]]) -> None:
+    headers = headers_for_cases(cases)
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
     files = {
         "[Content_Types].xml": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -252,7 +268,7 @@ def write_xlsx(output_path: Path, cases: list[dict[str, str]]) -> None:
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>''',
-        "xl/worksheets/sheet1.xml": worksheet_xml(EXPECTED_HEADERS, cases),
+        "xl/worksheets/sheet1.xml": worksheet_xml(headers, cases),
         "xl/styles.xml": styles_xml(),
         "docProps/core.xml": f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
@@ -614,9 +630,8 @@ def main(argv: list[str]) -> int:
                 " / ".join(
                     group
                     for group in (
-                        case.get("一级分组", ""),
-                        case.get("二级分组", ""),
-                        case.get("三级分组", ""),
+                        case.get(header, "")
+                        for header in group_headers_from_case(case)
                     )
                     if group
                 )

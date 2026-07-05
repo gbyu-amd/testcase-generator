@@ -13,14 +13,13 @@ import html
 import os
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from typing import Iterable
 
 
-EXPECTED_HEADERS = [
-    "一级分组",
-    "二级分组",
-    "三级分组",
+DEFAULT_GROUP_HEADERS = ["一级分组", "二级分组", "三级分组"]
+FIXED_CASE_HEADERS = [
     "用例名称",
     "优先级",
     "创建人",
@@ -35,11 +34,7 @@ EXPECTED_HEADERS = [
     "用例测试类",
     "关联项目",
 ]
-
-REQUIRED_HEADERS = [
-    "一级分组",
-    "二级分组",
-    "三级分组",
+REQUIRED_FIXED_HEADERS = [
     "用例名称",
     "优先级",
     "创建人",
@@ -50,9 +45,73 @@ REQUIRED_HEADERS = [
     "备注",
     "用例标签",
 ]
+GROUP_HEADER_LEVELS = {
+    "一级分组": 1,
+    "二级分组": 2,
+    "三级分组": 3,
+    "四级分组": 4,
+    "五级分组": 5,
+    "六级分组": 6,
+    "七级分组": 7,
+    "八级分组": 8,
+    "九级分组": 9,
+    "十级分组": 10,
+}
+GROUP_HEADERS_BY_LEVEL = {
+    level: header for header, level in GROUP_HEADER_LEVELS.items()
+}
+
+EXPECTED_HEADERS = DEFAULT_GROUP_HEADERS + FIXED_CASE_HEADERS
+REQUIRED_HEADERS = DEFAULT_GROUP_HEADERS + REQUIRED_FIXED_HEADERS
 
 VALID_PRIORITIES = {"P0", "P1", "P2"}
 DIFFICULTY_LEVELS = ("简单", "一般", "困难")
+
+
+def is_group_header(header: str) -> bool:
+    return header in GROUP_HEADER_LEVELS
+
+
+def group_headers_from_headers(headers: Iterable[str]) -> list[str]:
+    return [header for header in headers if is_group_header(header)]
+
+
+def group_headers_from_case(case: dict[str, str]) -> list[str]:
+    headers = case.get("_headers")
+    if isinstance(headers, list):
+        return group_headers_from_headers(headers)
+    return [header for header in DEFAULT_GROUP_HEADERS if header in case]
+
+
+def group_headers_for_count(count: int) -> list[str]:
+    return [
+        GROUP_HEADERS_BY_LEVEL[level]
+        for level in range(1, count + 1)
+        if level in GROUP_HEADERS_BY_LEVEL
+    ]
+
+
+def expected_headers_for(group_headers: list[str]) -> list[str]:
+    return group_headers + FIXED_CASE_HEADERS
+
+
+def required_headers_for(group_headers: list[str]) -> list[str]:
+    return ["一级分组"] + REQUIRED_FIXED_HEADERS
+
+
+def is_case_header(cells: list[str]) -> bool:
+    if len(cells) != len(set(cells)):
+        return False
+    if "用例名称" not in cells:
+        return False
+    name_index = cells.index("用例名称")
+    group_headers = cells[:name_index]
+    if not group_headers:
+        return False
+    if cells[name_index:] != FIXED_CASE_HEADERS:
+        return False
+    levels = [GROUP_HEADER_LEVELS.get(header) for header in group_headers]
+    return levels == list(range(1, len(group_headers) + 1))
 
 
 def configure_output_encoding() -> None:
@@ -175,7 +234,8 @@ def _contains_all(text: str, keywords: Iterable[str]) -> bool:
 
 
 def _normalize_keyword_text(*values: str) -> str:
-    return "".join("\n".join(values).split()).lower()
+    normalized = unicodedata.normalize("NFKC", "\n".join(values))
+    return "".join(normalized.split()).lower()
 
 
 def _normalize_report_lifecycle_text(*values: str) -> str:
@@ -547,10 +607,11 @@ def parse_case_file(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     found_table = False
     while index < len(lines):
         cells = [normalize_cell(cell) for cell in split_markdown_row(lines[index])]
-        if len(cells) != len(EXPECTED_HEADERS) or set(cells) != set(EXPECTED_HEADERS):
+        if not is_case_header(cells):
             index += 1
             continue
-        header_indexes = {header: cells.index(header) for header in EXPECTED_HEADERS}
+        headers = expected_headers_for(group_headers_from_headers(cells))
+        header_indexes = {header: cells.index(header) for header in headers}
 
         found_table = True
         index += 1
@@ -574,18 +635,19 @@ def parse_case_file(path: Path) -> tuple[list[dict[str, str]], list[str]]:
                 continue
 
             normalized_cells = [normalize_cell(cell) for cell in row_cells]
-            if len(normalized_cells) != len(EXPECTED_HEADERS):
+            if len(normalized_cells) != len(headers):
                 warnings.append(
                     f"{path} 第 {index + 1} 行列数为 {len(normalized_cells)}，"
-                    f"期望 {len(EXPECTED_HEADERS)}，已跳过"
+                    f"期望 {len(headers)}，已跳过"
                 )
                 index += 1
                 continue
 
             case = {
                 header: normalized_cells[header_indexes[header]]
-                for header in EXPECTED_HEADERS
+                for header in headers
             }
+            case["_headers"] = headers
             case["_source_file"] = str(path)
             case["_source_line"] = str(index + 1)
             cases.append(case)

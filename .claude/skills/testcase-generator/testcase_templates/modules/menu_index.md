@@ -21,6 +21,7 @@
 | 业务站点 | 业务站点 / 方案管理 / 方案模板 | `business_site/scheme_manage/scheme_templates_template.md` |
 | 业务站点 | 业务站点 / 方案管理 / 方案编制 | `business_site/scheme_manage/scheme_formulation_template.md` |
 | 业务站点 | 业务站点 / 方案执行 / 相关性分析汇总 | `business_site/scheme_execution/correlation_analysis_template.md` |
+| 业务站点 | 业务站点 / 方案执行 / 监控项目 / 单值控制图 | `business_site/scheme_execution/monitoring_items_i_chart_template.md` |
 | 业务站点 | 业务站点 / 方案执行 / 监控项目 / 箱线图 | `business_site/scheme_execution/monitoring_items_box_plot_template.md` |
 | 业务站点 | 业务站点 / 方案执行 / 监控项目 / 配对T检验 | `business_site/scheme_execution/monitoring_items_paired_t_template.md` |
 | 业务站点 | 业务站点 / 报告管理 / 报告编制 | `business_site/report_manage/report_generation_template.md` |

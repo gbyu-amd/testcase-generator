@@ -48,7 +48,7 @@
 ### 生成前提
 
 - 先读取 `knowledge_base/core_flows/one_click_analysis_flow.md`。
-- 参考 `testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot_template.md`、`testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t_template.md` 中一键分析相关用例风格。
+- 参考 `testcase_templates/modules/business_site/scheme_execution/monitoring_items_i_chart_template.md` 中一键分析相关用例风格。
 - 一键分析默认先覆盖触发方式：`数据替换`、`数据处理`。
 - 已存在未分析项时，还需覆盖未分析项在数据替换或数据处理后重新参与一键分析的场景。
 - 一键分析失败原因按当前分析方法的 PRD / UI、变量类型和算法限制筛选，不固定套用下方所有“候选失败原因”类别。
@@ -58,8 +58,8 @@
 ### 分组和回查口径
 
 - “默认覆盖项”和“候选失败原因”是生成后回查清单，回查结果写入需求覆盖率对照表。
-- “二级分组 / 三级分组”是测试用例表中的组织字段，不得把“适用失败原因”等回查项直接当作用例分组名。
-- 一键分析用例通常使用二级分组 `一键分析`；三级分组按实际场景填写，如 `数据替换`、`数据处理`、`一键分析结果提示`、`未分析的图参与一键分析`、`定类变量暂不支持分析`、`字段删减`、`其他原因`。
+- 分组列是测试用例表中的组织字段，不得把“适用失败原因”等回查项直接当作用例分组名。
+- 一键分析用例通常使用二级分组 `一键分析`；三级分组及后续分组按实际场景填写，如 `数据替换`、`数据处理`、`一键分析结果提示`、`未分析的图参与一键分析`、`定类变量暂不支持分析`、`字段删减`、`其他原因`，必要时可用 `四级分组` 承载更细子功能。
 
 ### 候选失败原因
 

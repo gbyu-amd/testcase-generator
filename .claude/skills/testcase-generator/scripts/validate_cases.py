@@ -53,18 +53,22 @@ from pathlib import Path
 from case_utils import (
     DIFFICULTY_LEVELS,
     EXPECTED_HEADERS,
-    REQUIRED_HEADERS,
     VALID_PRIORITIES,
     build_source_path,
     configure_output_encoding,
     discover_case_files,
     ensure_under,
+    expected_headers_for,
+    group_headers_from_case,
+    group_headers_from_headers,
     infer_case_difficulty_with_reason,
+    is_case_header,
     is_separator_row,
     normalize_cell,
     parse_case_file,
     project_root,
     read_text_file,
+    required_headers_for,
     split_case_tags,
     split_markdown_row,
     write_text_file,
@@ -237,11 +241,7 @@ def case_location(case: dict[str, str]) -> str:
 
 
 def case_group(case: dict[str, str]) -> str:
-    groups = [
-        case.get("一级分组", ""),
-        case.get("二级分组", ""),
-        case.get("三级分组", ""),
-    ]
+    groups = [case.get(header, "") for header in group_headers_from_case(case)]
     return " / ".join(group for group in groups if group) or "未分组"
 
 
@@ -249,9 +249,7 @@ def case_text(case: dict[str, str]) -> str:
     return "\n".join(
         normalize_cell(case.get(field, ""))
         for field in [
-            "一级分组",
-            "二级分组",
-            "三级分组",
+            *group_headers_from_case(case),
             "用例名称",
             "前置条件",
             "用例步骤",
@@ -317,8 +315,9 @@ def markdown_row(values: list[str]) -> str:
     return "| " + " | ".join(escape_markdown_cell(value) for value in values) + " |"
 
 
-def markdown_separator() -> str:
-    return "| " + " | ".join("---" for _ in EXPECTED_HEADERS) + " |"
+def markdown_separator(headers: list[str] | None = None) -> str:
+    headers = headers or EXPECTED_HEADERS
+    return "| " + " | ".join("---" for _ in headers) + " |"
 
 
 def fix_case_file(path: Path) -> dict[str, object]:
@@ -334,28 +333,27 @@ def fix_case_file(path: Path) -> dict[str, object]:
     index = 0
     while index < len(lines):
         cells = [normalize_cell(cell) for cell in split_markdown_row(lines[index])]
-        is_known_header = (
-            len(cells) == len(EXPECTED_HEADERS) and set(cells) == set(EXPECTED_HEADERS)
-        )
+        is_known_header = is_case_header(cells)
 
         if not is_known_header:
             updated_lines.append(lines[index].rstrip())
             index += 1
             continue
 
-        canonical_header = markdown_row(EXPECTED_HEADERS)
+        headers = expected_headers_for(group_headers_from_headers(cells))
+        canonical_header = markdown_row(headers)
         if lines[index].rstrip() != canonical_header:
             fixed_headers += 1
         updated_lines.append(canonical_header)
         index += 1
 
         if index < len(lines) and is_separator_row(split_markdown_row(lines[index])):
-            if lines[index].rstrip() != markdown_separator():
+            if lines[index].rstrip() != markdown_separator(headers):
                 fixed_separators += 1
             index += 1
         else:
             fixed_separators += 1
-        updated_lines.append(markdown_separator())
+        updated_lines.append(markdown_separator(headers))
 
         while index < len(lines) and lines[index].strip().startswith("|"):
             row_cells = split_markdown_row(lines[index])
@@ -368,7 +366,7 @@ def fix_case_file(path: Path) -> dict[str, object]:
             if len(normalized_cells) == len(cells):
                 row_by_header = dict(zip(cells, normalized_cells))
                 fixed_row = markdown_row(
-                    [row_by_header.get(header, "") for header in EXPECTED_HEADERS]
+                    [row_by_header.get(header, "") for header in headers]
                 )
                 if lines[index].rstrip() != fixed_row:
                     changed_rows += 1
@@ -517,7 +515,11 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
     issues: list[Issue] = []
 
     for case in cases:
-        missing_fields = [header for header in REQUIRED_HEADERS if not case[header]]
+        missing_fields = [
+            header
+            for header in required_headers_for(group_headers_from_case(case))
+            if not case.get(header, "")
+        ]
         if missing_fields:
             issues.append(
                 case_issue(
@@ -810,6 +812,10 @@ def _case_module_set(case: dict[str, str]) -> set[str]:
     return {case.get("一级分组", ""), case.get("二级分组", "")}
 
 
+def group_path_contains(case: dict[str, str], keyword: str) -> bool:
+    return any(keyword in case.get(header, "") for header in group_headers_from_case(case))
+
+
 def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
     """CPV 核心业务模块应覆盖约定的关键场景关键词，缺失时给出 WARN。"""
     issues: list[Issue] = []
@@ -824,13 +830,13 @@ def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
         module_cases = [case for case in cases if module in _case_module_set(case)]
         if module == "报告编制":
             module_cases = [
-                case for case in module_cases if "影响范围" not in case.get("三级分组", "")
+                case for case in module_cases if not group_path_contains(case, "影响范围")
             ]
             if not module_cases:
                 continue
         scoped_keyword_groups = keyword_groups
         if module == "报告编制" and module_cases and all(
-            "导出" in case.get("三级分组", "") for case in module_cases
+            group_path_contains(case, "导出") for case in module_cases
         ):
             scoped_keyword_groups = [
                 groups for groups in keyword_groups if groups[0] not in {"审批", "生效"}
@@ -942,7 +948,7 @@ def validate_data_analysis_one_click_rules(cases: list[dict[str, str]]) -> list[
                 Issue(
                     severity="WARN",
                     code="one_click_missing_field_deletion_case",
-                    message="控制图一键分析已出现字段删减风险，但缺少三级分组为“字段删减”的独立用例",
+                    message="控制图一键分析已出现字段删减风险，但缺少分组路径包含“字段删减”的独立用例",
                     file=source_file,
                 )
             )
