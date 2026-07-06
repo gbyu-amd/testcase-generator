@@ -708,6 +708,54 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
     return issues
 
 
+def validate_group_priority_order(cases: list[dict[str, str]]) -> list[Issue]:
+    """检查同一分组下用例的优先级是否满足 P0 → P1 → P2 非降序。"""
+    priority_order = {"P0": 0, "P1": 1, "P2": 2}
+
+    # 按 (源文件, 完整分组路径) 聚合，跨文件不合并
+    groups: dict[tuple[str, str], list[dict[str, str]]] = {}
+    for case in cases:
+        key = (case.get("_source_file", ""), case_group(case))
+        groups.setdefault(key, []).append(case)
+
+    issues: list[Issue] = []
+    for (_source_file, group_path), group_cases in groups.items():
+        if len(group_cases) < 2:
+            continue
+        priorities = [case.get("优先级", "") for case in group_cases]
+        # 存在非法优先级时由其他规则处理，跳过本检查
+        if any(p not in priority_order for p in priorities):
+            continue
+        values = [priority_order[p] for p in priorities]
+        is_non_decreasing = all(
+            values[i] <= values[i + 1] for i in range(len(values) - 1)
+        )
+        if is_non_decreasing:
+            continue
+        # 找第一条违反非降序的位置作为定位
+        violation_idx = next(
+            (i for i in range(1, len(values)) if values[i] < values[i - 1]),
+            None,
+        )
+        if violation_idx is None:
+            continue
+        violation_case = group_cases[violation_idx]
+        prev_priority = group_cases[violation_idx - 1].get("优先级", "")
+        curr_priority = violation_case.get("优先级", "")
+        issues.append(
+            case_issue(
+                violation_case,
+                "WARN",
+                "group_priority_order",
+                f"分组 [{group_path}] 内优先级顺序不符合 P0 → P1 → P2，"
+                f"当前顺序 {' → '.join(priorities)}，"
+                f"{curr_priority} 不应排在 {prev_priority} 之后",
+                field="优先级",
+            )
+        )
+    return issues
+
+
 def validate_ui_case_deduplication(cases: list[dict[str, str]]) -> list[Issue]:
     issues: list[Issue] = []
     ui_cases_by_scope: dict[tuple[str, str, str], list[dict[str, str]]] = {}
@@ -1167,6 +1215,7 @@ def main(argv: list[str]) -> int:
         return 1
 
     issues.extend(validate_case_rows(cases))
+    issues.extend(validate_group_priority_order(cases))
     issues.extend(validate_ui_case_deduplication(cases))
     issues.extend(validate_file_sources(case_files, cases))
     issues.extend(validate_duplicates(cases))
