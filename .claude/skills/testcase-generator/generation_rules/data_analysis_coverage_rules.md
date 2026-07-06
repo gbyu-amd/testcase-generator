@@ -55,7 +55,10 @@
 ### 生成前提
 
 - 先读取 `knowledge_base/core_flows/one_click_analysis_flow.md`。
-- 参考 `testcase_templates/modules/business_site/scheme_execution/monitoring_items_i_chart_template.md` 中一键分析相关用例风格。
+- 参考以下模板中的一键分析相关用例风格：
+  - `testcase_templates/modules/business_site/scheme_execution/monitoring_items_i_chart_template.md`
+  - `testcase_templates/modules/business_site/scheme_execution/monitoring_items_box_plot_template.md`
+  - `testcase_templates/modules/business_site/scheme_execution/monitoring_items_paired_t_template.md`
 - 一键分析默认先覆盖触发方式：`数据替换`、`数据处理`。
 - 已存在未分析项时，还需覆盖未分析项在数据替换或数据处理后重新参与一键分析的场景。
 - 一键分析失败原因按当前分析方法的 PRD / UI、变量类型和算法限制筛选，不固定套用下方所有“候选失败原因”类别。
