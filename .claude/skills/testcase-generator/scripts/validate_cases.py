@@ -48,6 +48,7 @@ import re
 import sys
 from collections import Counter
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from pathlib import Path
 
 from case_utils import (
@@ -165,6 +166,10 @@ EMPTY_GENERATED_HEADERS = ["是否自动化", "关联接口", "用例测试类",
 
 # 生成耗时占位词：交付前必须按实际耗时回填
 DURATION_PLACEHOLDER_RE = re.compile(r"生成耗时：(?:待回填|约|预计)")
+
+# 生成时间：提取行内容并校验格式必须为 YYYY-MM-DD HH:MM:SS（精确到秒）
+GENERATED_TIME_LINE_RE = re.compile(r"生成时间：([^\n\r]+)")
+GENERATED_TIME_FORMAT_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
 
 # CPV 核心业务模块需要覆盖的关键场景关键词（任一同义词命中即算覆盖）
 CORE_FLOW_KEYWORDS = {
@@ -977,8 +982,9 @@ def validate_core_flow_coverage(cases: list[dict[str, str]]) -> list[Issue]:
 
 
 def validate_duration_metadata(case_files: list[Path]) -> list[Issue]:
-    """最终交付前，"生成耗时"不得保留 待回填/约/预计 占位词。"""
+    """最终交付前，"生成耗时"不得保留 待回填/约/预计 占位词；"生成时间"必须为真实系统时间。"""
     issues: list[Issue] = []
+    now = datetime.now()
     for case_file in case_files:
         if not is_generated_output_path(case_file):
             continue
@@ -991,10 +997,59 @@ def validate_duration_metadata(case_files: list[Path]) -> list[Issue]:
                 Issue(
                     severity="WARN",
                     code="duration_placeholder_remaining",
-                    message="“生成耗时”仍为待回填/约/预计，导出前必须按实际耗时回填",
+                    message="生成耗时仍为待回填/约/预计，导出前必须按实际耗时回填",
                     file=str(case_file),
                 )
             )
+        # 校验生成时间：必须精确到秒、不得为未来时间
+        time_match = GENERATED_TIME_LINE_RE.search(metadata)
+        if time_match:
+            time_str = time_match.group(1).strip()
+            if not GENERATED_TIME_FORMAT_RE.match(time_str):
+                issues.append(
+                    Issue(
+                        severity="ERROR",
+                        code="generated_time_format_invalid",
+                        message=(
+                            f"生成时间格式必须为 YYYY-MM-DD HH:MM:SS（精确到秒），"
+                            f"当前为 {time_str}；请通过 date +%Y-%m-%d\\ %H:%M:%S 命令获取真实系统时间"
+                        ),
+                        file=str(case_file),
+                    )
+                )
+            else:
+                try:
+                    generated_time = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+                    if generated_time > now:
+                        issues.append(
+                            Issue(
+                                severity="ERROR",
+                                code="generated_time_in_future",
+                                message=(
+                                    f"生成时间 {time_str} 是未来时间，"
+                                    f"必须为真实的开始读取资料时刻，不得手动编写"
+                                ),
+                                file=str(case_file),
+                            )
+                        )
+                    elif (now - generated_time).total_seconds() > 86400:
+                        issues.append(
+                            Issue(
+                                severity="WARN",
+                                code="generated_time_too_old",
+                                message=f"生成时间 {time_str} 距今超过24小时，请确认是否正确",
+                                file=str(case_file),
+                            )
+                        )
+                except ValueError:
+                    issues.append(
+                        Issue(
+                            severity="ERROR",
+                            code="generated_time_format_invalid",
+                            message=f"生成时间 {time_str} 无法解析为有效日期时间",
+                            file=str(case_file),
+                        )
+                    )
     return issues
 
 

@@ -652,7 +652,18 @@ def main(argv: list[str]) -> int:
         print(f"共导出 {exported_count} 个 Excel 文件。")
 
     if started_at_resolved is not None:
-        duration_text = format_duration(started_at_resolved, datetime.now())
+        ended_at = datetime.now()
+        raw_elapsed = int((ended_at - started_at_resolved).total_seconds())
+        if raw_elapsed <= 0:
+            print(
+                f"导出失败：生成时间 {started_at_resolved.strftime('%Y-%m-%d %H:%M:%S')} "
+                f"不早于当前时间 {ended_at.strftime('%Y-%m-%d %H:%M:%S')}，"
+                f"耗时计算为 {raw_elapsed} 秒，可能不是真实系统时间；"
+                f"请通过 date \"+%Y-%m-%d %H:%M:%S\" 命令获取真实时间后更新元信息块",
+                file=sys.stderr,
+            )
+            return 1
+        duration_text = format_duration(started_at_resolved, ended_at)
         try:
             backfill_duration(case_files[0], duration_text)
             ensure_no_duration_placeholder(case_files[0])
