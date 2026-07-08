@@ -134,6 +134,9 @@ UI_REGION_SUFFIX_RE = re.compile(
 # 预期结果建议的最少字符数，过短通常说明缺少可验证的页面/数据/业务状态描述
 MIN_EXPECTATION_LENGTH = 10
 
+# 前置条件、用例步骤、预期结果单句/单步建议的最大字符数，超过建议拆分为多个编号
+MAX_SENTENCE_LENGTH = 50
+
 INVALID_SOURCE_REMARKS = {"", "无", "待填", "来源：待填"}
 INVALID_SOURCE_ATTRIBUTION_PATTERNS = [
     (
@@ -425,6 +428,29 @@ def is_too_short_expectation(value: str) -> bool:
     return len("".join(value.split())) < MIN_EXPECTATION_LENGTH
 
 
+def split_into_sentences(value: str) -> list[str]:
+    """按 <br>、换行或编号点（1. 2. 3.）拆分为独立句子。
+
+    用于前置条件、用例步骤、预期结果的"单句/单步"字数检查。
+    编号点格式包括 `1. `、`1、`，可写在同行或跨行。
+    """
+    if not value:
+        return []
+    # 先按 <br> 或换行拆分
+    parts = re.split(r"<br\s*/?>|\n", value)
+    # 再按行内编号点拆分（如 "1. xxx 2. yyy" 写在一行）
+    sentences: list[str] = []
+    for part in parts:
+        sub_parts = re.split(r"(?:^|\s)\d+[.、]\s*", part)
+        sentences.extend(p.strip() for p in sub_parts if p.strip())
+    return sentences
+
+
+def find_overlong_sentences(value: str) -> list[str]:
+    """返回单句字符数超过 MAX_SENTENCE_LENGTH 的子句列表，空时表示合规。"""
+    return [s for s in split_into_sentences(value) if len(s) > MAX_SENTENCE_LENGTH]
+
+
 def requires_source_remark(case: dict[str, str]) -> bool:
     source_file = case.get("_source_file", "")
     if not source_file:
@@ -564,6 +590,32 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     "用例步骤",
                 )
             )
+        overlong_steps = find_overlong_sentences(steps) if steps else []
+        if overlong_steps:
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "step_too_long",
+                    f"用例步骤单步超过 {MAX_SENTENCE_LENGTH} 字（最长 {len(overlong_steps[0])} 字），建议按业务阶段拆分为多个编号",
+                    "用例步骤",
+                )
+            )
+
+        precondition = case["前置条件"]
+        overlong_preconditions = (
+            find_overlong_sentences(precondition) if precondition else []
+        )
+        if overlong_preconditions:
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "precondition_too_long",
+                    f"前置条件单条超过 {MAX_SENTENCE_LENGTH} 字（最长 {len(overlong_preconditions[0])} 字），建议按外部依赖类型拆分为多个编号",
+                    "前置条件",
+                )
+            )
 
         remark = case["备注"]
         if requires_source_remark(case) and not has_valid_source_remark(remark):
@@ -701,6 +753,20 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     "WARN",
                     "short_expectation",
                     f"预期结果过短，建议补充页面表现、数据状态或业务状态：{expectation}",
+                    "预期结果",
+                )
+            )
+
+        overlong_expectations = (
+            find_overlong_sentences(expectation) if expectation else []
+        )
+        if overlong_expectations:
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "expectation_too_long",
+                    f"预期结果单句超过 {MAX_SENTENCE_LENGTH} 字（最长 {len(overlong_expectations[0])} 字），建议按验证目标拆分为多个编号",
                     "预期结果",
                 )
             )
@@ -1021,6 +1087,77 @@ def validate_data_analysis_one_click_rules(cases: list[dict[str, str]]) -> list[
     return issues
 
 
+def validate_group_adjacency(cases: list[dict[str, str]]) -> list[Issue]:
+    """检查同一文件内分组相邻性和一级分组聚集性。
+
+    规则依据 testcase_writing_guidelines.md：
+    - 相同完整分组路径的用例必须连续放在一起，不得被其他分组路径用例打断。
+    - 同一一级分组下的所有用例必须聚集在连续区间内，不得被其他一级分组的用例打断。
+    """
+    issues: list[Issue] = []
+
+    # 按文件分组，保持原顺序；跨文件不合并
+    cases_by_file: dict[str, list[dict[str, str]]] = {}
+    for case in cases:
+        cases_by_file.setdefault(case.get("_source_file", ""), []).append(case)
+
+    for _source_file, file_cases in cases_by_file.items():
+        if len(file_cases) < 2:
+            continue
+
+        # 检查 1：完整分组路径相邻性
+        seen_full_path: dict[str, dict[str, str]] = {}
+        prev_full_path: str | None = None
+        for case in file_cases:
+            full_path = case_group(case)
+            if (
+                full_path in seen_full_path
+                and prev_full_path != full_path
+                and prev_full_path is not None
+            ):
+                first_case = seen_full_path[full_path]
+                first_line = first_case.get("_source_line", "")
+                issues.append(
+                    case_issue(
+                        case,
+                        "WARN",
+                        "group_not_adjacent",
+                        f"分组 [{full_path}] 与第 {first_line} 行的同名分组不相邻，中间被其他分组打断；"
+                        "相同完整分组路径的用例必须连续排列",
+                        "分组",
+                    )
+                )
+            if full_path not in seen_full_path:
+                seen_full_path[full_path] = case
+            prev_full_path = full_path
+
+        # 检查 2：一级分组聚集性
+        seen_l1: dict[str, dict[str, str]] = {}
+        prev_l1: str | None = None
+        for case in file_cases:
+            l1 = case.get("一级分组", "")
+            if not l1:
+                continue
+            if l1 in seen_l1 and prev_l1 != l1 and prev_l1 is not None:
+                first_case = seen_l1[l1]
+                first_line = first_case.get("_source_line", "")
+                issues.append(
+                    case_issue(
+                        case,
+                        "WARN",
+                        "first_level_group_split",
+                        f"一级分组 [{l1}] 与第 {first_line} 行的同名一级分组不相邻，被其他一级分组打断；"
+                        "同一一级分组下的所有用例必须聚集在连续区间内",
+                        "一级分组",
+                    )
+                )
+            if l1 not in seen_l1:
+                seen_l1[l1] = case
+            prev_l1 = l1
+
+    return issues
+
+
 def validate_duplicates(cases: list[dict[str, str]]) -> list[Issue]:
     issues: list[Issue] = []
 
@@ -1219,6 +1356,7 @@ def main(argv: list[str]) -> int:
     issues.extend(validate_ui_case_deduplication(cases))
     issues.extend(validate_file_sources(case_files, cases))
     issues.extend(validate_duplicates(cases))
+    issues.extend(validate_group_adjacency(cases))
     issues.extend(validate_core_flow_coverage(cases))
     issues.extend(validate_data_analysis_one_click_rules(cases))
     issues.extend(validate_duration_metadata(case_files))
