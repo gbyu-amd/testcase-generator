@@ -76,6 +76,31 @@ def _has_inline_image(paragraph) -> bool:
     return "w:drawing" in xml or "w:pict" in xml
 
 
+def _get_image_rel_ids(paragraph) -> list[str]:
+    """从段落元素中提取所有图片的 relationship ID。"""
+    rel_ids: list[str] = []
+    for blip in paragraph._element.iter(qn("a:blip")):
+        embed = blip.get(qn("r:embed"))
+        if embed:
+            rel_ids.append(embed)
+    return rel_ids
+
+
+def _get_image_extension(image_part) -> str:
+    """根据 image_part 的 content_type 获取文件扩展名。"""
+    content_type = getattr(image_part, "content_type", "")
+    type_map = {
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/gif": ".gif",
+        "image/bmp": ".bmp",
+        "image/tiff": ".tif",
+        "image/x-emf": ".emf",
+        "image/x-wmf": ".wmf",
+    }
+    return type_map.get(content_type, ".png")
+
+
 def _paragraph_text(paragraph) -> str:
     parts: list[str] = []
     for run in paragraph.runs:
@@ -209,6 +234,53 @@ def render_blocks(blocks: list[DocBlock]) -> str:
     return "\n".join(lines) + ("\n" if lines else "")
 
 
+def extract_section_images(
+    docx_path: Path, section: str, output_dir: Path
+) -> list[Path]:
+    """从指定章节中提取所有嵌入图片，保存到 output_dir 目录。
+
+    返回保存的图片路径列表（不含已存在的图片）。
+    """
+    doc = Document(str(docx_path))
+    normalized_section = _normalized_heading(section)
+    saved_paths: list[Path] = []
+    image_count = 0
+
+    section_started = False
+    section_level = 0
+
+    for paragraph in doc.paragraphs:
+        text = _paragraph_text(paragraph)
+        level = _heading_level(paragraph)
+
+        if not section_started:
+            if level and _normalized_heading(text) == normalized_section:
+                section_started = True
+                section_level = level
+            continue
+
+        if level and level <= section_level:
+            break
+
+        if not _has_inline_image(paragraph):
+            continue
+
+        for rel_id in _get_image_rel_ids(paragraph):
+            image_part = doc.part.related_parts.get(rel_id)
+            if image_part is None or not hasattr(image_part, "blob"):
+                continue
+            image_count += 1
+            ext = _get_image_extension(image_part)
+            image_name = f"page_{image_count}{ext}"
+            image_path = output_dir / image_name
+            if image_path.exists():
+                continue
+            image_path.write_bytes(image_part.blob)
+            saved_paths.append(image_path)
+
+    return saved_paths
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="从 Word (.docx) 直接列出章节或提取章节内容。"
@@ -229,6 +301,11 @@ def parse_args() -> argparse.Namespace:
         "--print",
         action="store_true",
         help="兼容旧命令参数；当前脚本始终打印到标准输出",
+    )
+    parser.add_argument(
+        "--extract-images",
+        action="store_true",
+        help="提取指定章节下的嵌入图片到 inputs/ui_design/<章节名>/ 目录，需配合 --section 使用",
     )
     return parser.parse_args()
 
@@ -266,6 +343,38 @@ def main() -> int:
         print(f"共 {len(sections)} 个章节：\n")
         for section in sections:
             print(f"{'  ' * (section.level - 1)}{'#' * section.level} {section.text}")
+        return 0
+
+    if args.extract_images:
+        if not args.section:
+            print("错误：--extract-images 需要配合 --section 使用", file=sys.stderr)
+            return 1
+        try:
+            selected_blocks = extract_section(blocks, args.section)
+        except ValueError as exc:
+            print(f"错误：{exc}", file=sys.stderr)
+            return 1
+        if not selected_blocks:
+            print(f"错误：未找到章节「{args.section}」，请检查标题名称。", file=sys.stderr)
+            return 1
+
+        root = project_root()
+        section_dir_name = args.section.strip()
+        output_dir = root / "inputs" / "ui_design" / section_dir_name
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        saved = extract_section_images(docx_path, args.section, output_dir)
+        if not saved:
+            existing = list(output_dir.glob("*"))
+            if existing:
+                print(f"章节「{args.section}」的图片已存在，未提取新图片。")
+            else:
+                print(f"章节「{args.section}」未检测到嵌入图片。")
+            return 0
+
+        print(f"已提取 {len(saved)} 张图片到 {output_dir.relative_to(root)}：")
+        for path in saved:
+            print(f"  {path.relative_to(root)}")
         return 0
 
     try:

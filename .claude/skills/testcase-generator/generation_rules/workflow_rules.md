@@ -14,6 +14,8 @@ python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --s
 
 提取到的章节内容直接用于生成用例，不生成中间需求文件。
 
+PRD 中引用其他章节时（如"逻辑见 X.X.X 章节"），必须提取被引用章节的内容，将其作为当前需求的一部分设计对应用例，不得跳过。
+
 如果用户未指定章节，可先列章节：
 
 ```bash

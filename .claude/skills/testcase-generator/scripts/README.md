@@ -7,7 +7,7 @@
 ## 脚本列表
 
 - `case_utils.py`：公共工具模块，提供表头定义、路径安全检查、Markdown 表格解析和文件发现逻辑，不需要直接运行。
-- `extract_docx.py`：从 Word (.docx) 文档直接列出章节或提取指定章节，忽略所有图片；脚本只打印到标准输出，不生成中间需求文件。
+- `extract_docx.py`：从 Word (.docx) 文档列出章节、提取指定章节文本或提取章节内的嵌入图片到 `inputs/ui_design/`；脚本只打印到标准输出，不生成中间需求文件。
 - `validate_cases.py`：检查标准表头、字段完整性、优先级、重复用例、来源引用、UI 用例重复、核心流程覆盖和数据分析一键分析专项规则，支持 ERROR/WARN 分级、JSON 输出和安全格式修复。
 - `export_testcases.py`：将模块 Markdown 用例导出为 Excel 表格文件，导出前会先执行完整校验。
 
@@ -40,6 +40,14 @@ python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --s
 ```
 
 `extract_docx.py` 必须显式传入 `.docx` 路径；脚本只读取 Word 文档并打印章节文本，不写入中间 Markdown 需求文件。
+
+### 提取章节内的嵌入图片
+
+```bash
+python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --section "<章节名>" --extract-images
+```
+
+提取指定章节下的所有嵌入图片，自动保存到 `inputs/ui_design/<章节名>/` 目录。图片按文档中出现顺序命名为 `page_1.png`、`page_2.png` 等；目录已存在且有同名图片时不覆盖，只补充新图片；章节无嵌入图片时提示未检测到。
 
 ## 校验用例脚本
 

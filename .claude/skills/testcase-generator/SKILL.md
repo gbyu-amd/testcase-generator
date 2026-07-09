@@ -92,6 +92,9 @@ python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --l
 # 从 Word 直接提取章节内容（默认推荐）
 python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --section "<章节名>" --print
 
+# 从 Word 提取章节内的嵌入图片到 inputs/ui_design/<章节名>/
+python scripts/extract_docx.py inputs/requirements/raw_docs/<文件名>.docx --section "<章节名>" --extract-images
+
 # 校验单个 Markdown 用例文件
 python scripts/validate_cases.py --source outputs/origin_exports/<site_type>/<module_name>_testcases.md
 

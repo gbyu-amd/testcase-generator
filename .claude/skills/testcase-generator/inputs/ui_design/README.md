@@ -24,7 +24,9 @@ ui_design/
 - 目录名使用中文章节名，与提示词一致，AI 可直接按章节名定位
 - 原始 Word 文件统一放在 `inputs/requirements/raw_docs/`，不放在本目录
 - 新收到但未确认归属的图片先放入 `_incoming/`，确认后人工移入对应章节目录
-- 目录由人工创建和维护，无需运行脚本
+- 目录可通过以下两种方式创建和维护：
+  1. **自动提取**：运行 `python scripts/extract_docx.py <docx> --section "<章节名>" --extract-images`，自动从 PRD Word 文档中提取指定章节下的嵌入图片，保存为 `page_1.png`、`page_2.png` 等到本目录
+  2. **手动放置**：人工截图或导出图片后放入对应章节目录，可自定义图片名称
 
 ## 阅读重点
 
