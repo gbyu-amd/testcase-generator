@@ -816,7 +816,7 @@ def validate_group_priority_order(cases: list[dict[str, str]]) -> list[Issue]:
         issues.append(
             case_issue(
                 violation_case,
-                "WARN",
+                "ERROR",
                 "group_priority_order",
                 f"分组 [{group_path}] 内优先级顺序不符合 P0 → P1 → P2，"
                 f"当前顺序 {' → '.join(priorities)}，"
