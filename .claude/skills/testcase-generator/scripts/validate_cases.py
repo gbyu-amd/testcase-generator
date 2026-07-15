@@ -232,6 +232,48 @@ ONE_CLICK_REPAIR_FIELD_PRESERVED_RE = re.compile(
     r"(字段仍保留|变量仍保留|仍保留在配置中|未被清空|未清空|没有清空)"
 )
 
+# 字段已被清空/删除/类型不匹配的失败场景关键词
+# 这类失败按"未分析项修复判定"不应生成"修复后一键分析成功"用例
+ONE_CLICK_FIELD_CLEARED_MARKERS = (
+    "字段删减", "字段缺失", "字段不存在", "字段有删减",
+    "字段匹配失败", "字段未匹配", "未匹配",
+    "匹配上定类变量", "为定类变量", "变为定类", "变定类",
+    "非定量",
+    "变量清空", "字段清空", "已清空",
+    "变量缺失",
+)
+
+# 从一键分析用例名称中剥离的结构性词汇（非原因关键词）
+ONE_CLICK_REASON_STRIP_RE = re.compile(
+    r"未分析的|未分析|一键分析|修复后|参与|成功|"
+    r"时|触发|异常提示|异常|提示|仍|保持|的|"
+    r"替换数据源|数据处理|执行|返回|确认|"
+    r"纵轴变量|横轴变量|子组大小|变量|"
+    r"[（）\(\)【】\[\]「」“”‘’\"'，,。.!！？?：:；;\s]"
+)
+
+# 分析方法名称（剥离原因核心时使用）
+ONE_CLICK_METHOD_RE = re.compile(
+    r"百分位数控制图|百分位数|"
+    r"NP控制图|P控制图|Xbar-S控制图|Xbar-R控制图|单值移动极差控制图|"
+    r"单值控制图|持续监控图|控制图|"
+    r"相关性帕累托排序图|相关性分析|帕累托图|"
+    r"拟合回归模型|拟合线图|箱线图|趋势图|单折线图|多折线图|"
+    r"双样本T检验|配对T检验|双样本等价检验|单因子方差分析|"
+    r"正态性检验|汇总报告图|多个Y值的单值图"
+)
+
+
+def extract_one_click_reason(name: str) -> str:
+    """从一键分析用例名称中提取原因核心（去除结构性词汇和方法名称）。
+
+    用于动态匹配"未分析"失败用例和"一键分析成功"修复用例是否成对出现，
+    不依赖硬编码的具体失败原因关键词。
+    """
+    stripped = ONE_CLICK_REASON_STRIP_RE.sub("", name)
+    stripped = ONE_CLICK_METHOD_RE.sub("", stripped)
+    return stripped.strip()
+
 
 @dataclass
 class Issue:
@@ -600,7 +642,7 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
             issues.append(
                 case_issue(
                     case,
-                    "WARN",
+                    "ERROR",
                     "step_too_long",
                     f"用例步骤单步超过 {MAX_SENTENCE_LENGTH} 字（最长 {len(overlong_steps[0])} 字），建议按业务阶段拆分为多个编号",
                     "用例步骤",
@@ -615,7 +657,7 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
             issues.append(
                 case_issue(
                     case,
-                    "WARN",
+                    "ERROR",
                     "precondition_too_long",
                     f"前置条件单条超过 {MAX_SENTENCE_LENGTH} 字（最长 {len(overlong_preconditions[0])} 字），建议按外部依赖类型拆分为多个编号",
                     "前置条件",
@@ -769,7 +811,7 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
             issues.append(
                 case_issue(
                     case,
-                    "WARN",
+                    "ERROR",
                     "expectation_too_long",
                     f"预期结果单句超过 {MAX_SENTENCE_LENGTH} 字（最长 {len(overlong_expectations[0])} 字），建议按验证目标拆分为多个编号",
                     "预期结果",
@@ -1071,7 +1113,7 @@ def validate_data_analysis_one_click_rules(cases: list[dict[str, str]]) -> list[
             issues.append(
                 case_issue(
                     case,
-                    "WARN",
+                    "ERROR",
                     "one_click_repair_name_missing_success",
                     "一键分析修复成功类用例名称必须明确包含“一键分析成功”，不得只写“修复后成功”",
                     "用例名称",
@@ -1086,7 +1128,7 @@ def validate_data_analysis_one_click_rules(cases: list[dict[str, str]]) -> list[
             issues.append(
                 case_issue(
                     case,
-                    "WARN",
+                    "ERROR",
                     "one_click_invalid_cleared_field_repair",
                     "字段删减、字段缺失、字段未匹配、匹配上定类变量或变量已清空时，不能生成一键分析修复成功用例；应改为未分析/需手动配置类用例",
                     "用例名称",
@@ -1115,29 +1157,69 @@ def validate_data_analysis_one_click_rules(cases: list[dict[str, str]]) -> list[
         ):
             issues.append(
                 Issue(
-                    severity="WARN",
+                    severity="ERROR",
                     code="one_click_missing_field_deletion_case",
                     message="控制图一键分析已出现字段删减风险，但缺少分组路径包含“字段删减”的独立用例",
                     file=source_file,
                 )
             )
 
-        has_non_integer_failure = (
-            "纵轴变量不包含整数时一键分析未分析" in one_click_names
-            or ("纵轴变量不包含整数" in one_click_names and "一键分析未分析" in one_click_names)
-        )
-        has_non_integer_repair = (
-            "纵轴变量不包含整数修复后一键分析成功" in one_click_names
-        )
-        if has_non_integer_failure and not has_non_integer_repair:
-            issues.append(
-                Issue(
-                    severity="WARN",
-                    code="one_click_missing_non_integer_repair_case",
-                    message="存在“纵轴变量不包含整数”的一键分析未分析用例，但缺少“纵轴变量不包含整数修复后一键分析成功”用例",
-                    file=source_file,
+        # 通用：字段保留类未分析失败应配有对应的"一键分析成功"修复用例
+        # 按未分析项修复判定：字段保留但值/样本/数量不满足约束时可生成修复成功用例
+        field_retained_failures: list[str] = []
+        for case in one_click_cases:
+            name = normalize_cell(case.get("用例名称", ""))
+            if "未分析" not in name:
+                continue
+            if "一键分析成功" in name:
+                continue  # 本身是修复成功用例，不作为失败用例参与匹配
+            if any(marker in name for marker in ONE_CLICK_FIELD_CLEARED_MARKERS):
+                continue  # 字段已清空类，不期望修复成功
+            field_retained_failures.append(name)
+
+        if field_retained_failures:
+            repair_success_names = [
+                normalize_cell(case.get("用例名称", ""))
+                for case in one_click_cases
+                if "一键分析成功" in normalize_cell(case.get("用例名称", ""))
+            ]
+            # 无任何修复成功用例时，统一给一条告警
+            if not repair_success_names:
+                issues.append(
+                    Issue(
+                        severity="ERROR",
+                        code="one_click_missing_field_retained_repair",
+                        message=(
+                            f"存在 {len(field_retained_failures)} 条字段保留类的未分析用例，"
+                            "但缺少任何「一键分析成功」修复用例；"
+                            "按未分析项修复判定，字段保留但值不满足约束时应生成修复后一键分析成功用例"
+                        ),
+                        file=source_file,
+                    )
                 )
-            )
+            else:
+                # 逐条匹配：失败原因核心是否出现在某条修复用例名称中
+                for failure_name in field_retained_failures:
+                    reason_core = extract_one_click_reason(failure_name)
+                    if len(reason_core) < 2:
+                        continue  # 核心过短，无法可靠匹配，跳过
+                    matched = any(
+                        reason_core in repair_name
+                        for repair_name in repair_success_names
+                    )
+                    if not matched:
+                        issues.append(
+                            Issue(
+                                severity="WARN",
+                                code="one_click_missing_field_retained_repair",
+                                message=(
+                                    f"存在字段保留类的未分析用例（{failure_name}），"
+                                    f"但未匹配到原因核心「{reason_core}」对应的「一键分析成功」修复用例；"
+                                    "按未分析项修复判定应成对生成修复后一键分析成功用例"
+                                ),
+                                file=source_file,
+                            )
+                        )
 
     return issues
 
@@ -1175,7 +1257,7 @@ def validate_group_adjacency(cases: list[dict[str, str]]) -> list[Issue]:
                 issues.append(
                     case_issue(
                         case,
-                        "WARN",
+                        "ERROR",
                         "group_not_adjacent",
                         f"分组 [{full_path}] 与第 {first_line} 行的同名分组不相邻，中间被其他分组打断；"
                         "相同完整分组路径的用例必须连续排列",
@@ -1199,7 +1281,7 @@ def validate_group_adjacency(cases: list[dict[str, str]]) -> list[Issue]:
                 issues.append(
                     case_issue(
                         case,
-                        "WARN",
+                        "ERROR",
                         "first_level_group_split",
                         f"一级分组 [{l1}] 与第 {first_line} 行的同名一级分组不相邻，被其他一级分组打断；"
                         "同一一级分组下的所有用例必须聚集在连续区间内",
@@ -1250,7 +1332,7 @@ def validate_duplicates(cases: list[dict[str, str]]) -> list[Issue]:
         locations = "；".join(case_location(case) for case in duplicated_cases)
         issues.append(
             text_issue(
-                "WARN",
+                "ERROR",
                 "duplicate_flow",
                 f"疑似重复流程：{group}，位置：{locations}",
             )

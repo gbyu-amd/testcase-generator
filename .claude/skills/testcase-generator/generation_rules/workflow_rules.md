@@ -298,6 +298,19 @@ python scripts/validate_cases.py --source outputs/origin_exports/<site_type>/<mo
 - 存在 `ERROR` 时，不得导出 Excel。
 - `validate_cases.py --fix` 只能修复 Markdown 表格格式，不得用于绕过业务语义问题。
 - 难度标签 WARN 不阻断默认导出；如果要求 Markdown 源文件 0 WARN，必须根据 WARN 明细修复源文件。
+- 以下结构类规则已升为 **ERROR**（阻断导出），生成时必须保证满足：
+  - `group_priority_order`：同级分组内用例必须按 P0 → P1 → P2 非降序排列
+  - `group_not_adjacent`：相同完整分组路径的用例必须连续，不得被其他分组打断
+  - `first_level_group_split`：同一一级分组下的所有用例必须聚集在连续区间内
+  - `duplicate_flow`：同一分组内不得存在前置条件、用例步骤和预期结果完全相同或高度相近的重复用例
+  - `step_too_long`：用例步骤单步不得超过 50 字
+  - `precondition_too_long`：前置条件单条不得超过 50 字
+  - `expectation_too_long`：预期结果单句不得超过 50 字
+- 以下一键分析专项规则已升为 **ERROR**（阻断导出），生成时必须保证满足：
+  - `one_click_repair_name_missing_success`：修复成功类用例名称必须包含「一键分析成功」，不得只写「修复后成功」
+  - `one_click_invalid_cleared_field_repair`：字段已清空/删减/类型不匹配的失败场景不得生成「修复后一键分析成功」用例
+  - `one_click_missing_field_deletion_case`：控制图一键分析已出现字段删减风险时，必须有分组路径包含「字段删减」的独立用例
+  - `one_click_missing_field_retained_repair`：字段保留类未分析失败必须配有对应的「一键分析成功」修复用例（通用动态匹配，详见 `data_analysis_coverage_rules.md` 未分析项修复判定）
 
 第一次生成（新建 / 覆盖 / 另存）时，推荐使用 `export_testcases.py --started-at` 一次完成单文件校验、Excel 导出和 `生成耗时` 回填：
 
