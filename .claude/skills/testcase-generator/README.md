@@ -198,6 +198,16 @@ python scripts/validate_cases.py --source testcase_templates/modules
 > 不带 `--source` 时脚本会默认递归扫描 `outputs/origin_exports/` 下所有用例文件，包括 `public_site/` 和 `business_site/`；
 > 分需求导出时必须显式指定单个 Markdown 文件，避免生成合并 Excel。
 
+## 运行测试
+
+核心纯函数（表头识别、难度推断、一键分析原因提取、XML 转义等）配有 pytest 单元测试，便于在改动后快速回归。
+
+```bash
+cd .claude/skills/testcase-generator
+pip install -r requirements-dev.txt
+python -m pytest scripts/tests/ -v
+```
+
 ## 文件说明
 
 - **SKILL.md**：Agent 执行规则，包含完整的生成流程和质量要求

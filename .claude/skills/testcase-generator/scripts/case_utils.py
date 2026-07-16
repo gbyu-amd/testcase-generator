@@ -5,6 +5,8 @@
 
 本模块集中维护测试用例表头、路径安全检查、Markdown 表格解析和文件发现逻辑。
 `validate_cases.py` 和 `export_testcases.py` 都依赖这里的公共能力，避免脚本之间互相承担不属于自身职责的工具函数。
+
+改动本文件后，请运行 `python -m pytest scripts/tests/ -v` 确认无回归。
 """
 
 from __future__ import annotations
@@ -17,9 +19,13 @@ import unicodedata
 from pathlib import Path
 from typing import Iterable
 
+from business_constants import CPV_SPECIFIC_HEADERS
+
 
 DEFAULT_GROUP_HEADERS = ["一级分组", "二级分组", "三级分组"]
-FIXED_CASE_HEADERS = [
+# 通用测试用例字段（9 项）+ CPV 团队约定的追踪字段（4 项）。
+# 业务字段集中在 business_constants.py，换项目时改一处即可同步影响下游解析。
+_GENERIC_FIXED_HEADERS = [
     "用例名称",
     "优先级",
     "创建人",
@@ -29,11 +35,8 @@ FIXED_CASE_HEADERS = [
     "预期结果",
     "备注",
     "用例标签",
-    "是否自动化",
-    "关联接口",
-    "用例测试类",
-    "关联项目",
 ]
+FIXED_CASE_HEADERS = _GENERIC_FIXED_HEADERS + CPV_SPECIFIC_HEADERS
 REQUIRED_FIXED_HEADERS = [
     "用例名称",
     "优先级",

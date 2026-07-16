@@ -33,6 +33,8 @@
     python scripts/export_testcases.py --source outputs/origin_exports/business_site/data_analysis_testcases.md --started-at "2026-06-29 13:50:00"
 
 本脚本只使用 Python 标准库，不需要额外安装依赖。
+
+改动本文件后，请运行 `python -m pytest scripts/tests/ -v` 确认无回归。
 """
 
 from __future__ import annotations
@@ -45,6 +47,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from xml.sax.saxutils import escape
 
+from business_constants import (
+    COLUMN_WIDTH_BY_HEADER,
+    CREATOR_NAME,
+    SHEET_NAME,
+    SITE_TYPES,
+)
 from case_utils import (
     EXPECTED_HEADERS,
     apply_difficulty_tags,
@@ -64,14 +72,7 @@ from case_utils import (
 from validate_cases import (
     format_issue,
     has_blocking_issues,
-    text_issue,
-    validate_case_rows,
-    validate_core_flow_coverage,
-    validate_data_analysis_one_click_rules,
-    validate_duration_metadata,
-    validate_duplicates,
-    validate_file_sources,
-    validate_ui_case_deduplication,
+    run_all_validations,
 )
 
 INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
@@ -79,7 +80,6 @@ INVALID_XML_CHARS = re.compile(r"[\x00-\x08\x0B\x0C\x0E-\x1F]")
 # Excel 样式索引（对应 styles_xml 中 cellXfs 的顺序）
 _STYLE_HEADER = 1    # 表头：加粗、绿色背景、居中
 _STYLE_DATA = 2      # 数据行：带边框、顶部对齐、自动换行
-SITE_TYPES = ("public_site", "business_site")
 
 DURATION_LINE_RE = re.compile(r"^(生成耗时：).*$", re.MULTILINE)
 DURATION_PLACEHOLDER_RE = re.compile(r"生成耗时：(?:待回填|约|预计)")
@@ -88,26 +88,9 @@ GENERATION_TIME_RE = re.compile(
     re.MULTILINE,
 )
 
-# 每列固定列宽；动态分组列未显式配置时使用 GROUP_COLUMN_WIDTH
+# 每列固定列宽集中在 business_constants.COLUMN_WIDTH_BY_HEADER；
+# 动态分组列未显式配置时使用 GROUP_COLUMN_WIDTH 兜底。
 GROUP_COLUMN_WIDTH = 16
-COLUMN_WIDTH_BY_HEADER = {
-    "一级分组": 16,
-    "二级分组": 16,
-    "三级分组": 16,
-    "用例名称": 36,
-    "优先级": 10,
-    "创建人": 12,
-    "用例描述": 16,
-    "前置条件": 36,
-    "用例步骤": 48,
-    "预期结果": 52,
-    "备注": 24,
-    "用例标签": 18,
-    "是否自动化": 14,
-    "关联接口": 24,
-    "用例测试类": 18,
-    "关联项目": 18,
-}
 
 
 def column_name(index: int) -> str:
@@ -120,7 +103,7 @@ def column_name(index: int) -> str:
 
 def safe_xml_text(value: str) -> str:
     value = INVALID_XML_CHARS.sub("", value)
-    return escape(value, entities={'"': "&quot;"})
+    return escape(value, entities={'"': "&quot;", "'": "&apos;"})
 
 
 def cell_xml(row_index: int, column_index: int, value: str, style_index: int) -> str:
@@ -258,10 +241,10 @@ def write_xlsx(output_path: Path, cases: list[dict[str, str]]) -> None:
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
   <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>''',
-        "xl/workbook.xml": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        "xl/workbook.xml": f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
-  <sheets><sheet name="测试用例" sheetId="1" r:id="rId1"/></sheets>
+  <sheets><sheet name="{SHEET_NAME}" sheetId="1" r:id="rId1"/></sheets>
 </workbook>''',
         "xl/_rels/workbook.xml.rels": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
@@ -276,19 +259,19 @@ def write_xlsx(output_path: Path, cases: list[dict[str, str]]) -> None:
     xmlns:dcterms="http://purl.org/dc/terms/"
     xmlns:dcmitype="http://purl.org/dc/dcmitype/"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:creator>CPV 功能测试用例生成器</dc:creator>
-  <cp:lastModifiedBy>CPV 功能测试用例生成器</cp:lastModifiedBy>
+  <dc:creator>{CREATOR_NAME}</dc:creator>
+  <cp:lastModifiedBy>{CREATOR_NAME}</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">{now}</dcterms:created>
   <dcterms:modified xsi:type="dcterms:W3CDTF">{now}</dcterms:modified>
 </cp:coreProperties>''',
-        "docProps/app.xml": '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+        "docProps/app.xml": f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
     xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
   <Application>Python 标准库</Application>
   <DocSecurity>0</DocSecurity>
   <ScaleCrop>false</ScaleCrop>
   <HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>工作表</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant></vt:vector></HeadingPairs>
-  <TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>测试用例</vt:lpstr></vt:vector></TitlesOfParts>
+  <TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr>{SHEET_NAME}</vt:lpstr></vt:vector></TitlesOfParts>
 </Properties>''',
     }
 
@@ -573,28 +556,19 @@ def main(argv: list[str]) -> int:
     exported_count = 0
     for group_name, group_files, output_path in export_groups:
         cases: list[dict[str, str]] = []
-        warnings: list[str] = []
+        parse_warnings: list[str] = []
         for case_file in group_files:
-            parsed_cases, parse_warnings = parse_case_file(case_file)
+            parsed_cases, file_warnings = parse_case_file(case_file)
             cases.extend(parsed_cases)
-            warnings.extend(parse_warnings)
+            parse_warnings.extend(file_warnings)
 
         if not cases:
             print(f"导出失败：{group_name} 未解析到测试用例", file=sys.stderr)
-            for warning in warnings:
+            for warning in parse_warnings:
                 print(f"- {warning}", file=sys.stderr)
             return 1
 
-        validation_issues = [
-            text_issue("ERROR", "parse_error", warning) for warning in warnings
-        ]
-        validation_issues.extend(validate_case_rows(cases))
-        validation_issues.extend(validate_ui_case_deduplication(cases))
-        validation_issues.extend(validate_file_sources(group_files, cases))
-        validation_issues.extend(validate_duplicates(cases))
-        validation_issues.extend(validate_core_flow_coverage(cases))
-        validation_issues.extend(validate_data_analysis_one_click_rules(cases))
-        validation_issues.extend(validate_duration_metadata(group_files))
+        validation_issues = run_all_validations(group_files, cases, parse_warnings)
 
         if validation_issues:
             print(f"导出前校验结果（{group_name}）：")

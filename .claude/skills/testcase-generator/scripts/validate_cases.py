@@ -38,6 +38,8 @@
     python scripts/validate_cases.py --fix
     python scripts/validate_cases.py --json
     python scripts/validate_cases.py --source testcase_templates/modules
+
+改动本文件后，请运行 `python -m pytest scripts/tests/ -v` 确认无回归。
 """
 
 from __future__ import annotations
@@ -51,9 +53,22 @@ from dataclasses import asdict, dataclass
 from datetime import datetime
 from pathlib import Path
 
+from business_constants import (
+    CPV_SPECIFIC_HEADERS,
+    CORE_FLOW_KEYWORDS,
+    ENABLED_BUSINESS_RULES,
+    MAX_GROUP_DEPTH,
+    ONE_CLICK_FIELD_CLEARED_MARKERS,
+    ONE_CLICK_METHOD_RE,
+    ONE_CLICK_REASON_STRIP_RE,
+    ONE_CLICK_REPAIR_FIELD_PRESERVED_RE,
+    ONE_CLICK_REPAIR_FIELD_RE,
+    ONE_CLICK_REPAIR_INVALID_STATE_RE,
+)
 from case_utils import (
     DIFFICULTY_LEVELS,
     EXPECTED_HEADERS,
+    GROUP_HEADER_LEVELS,
     VALID_PRIORITIES,
     build_source_path,
     configure_output_encoding,
@@ -162,7 +177,7 @@ INVALID_SOURCE_ATTRIBUTION_PATTERNS = [
         "用例模板来源必须写具体 .md 文件名，例如“来源：monitoring_items_paired_t_template.md”，不得写为“来源：监控项目用例模板”",
     ),
 ]
-EMPTY_GENERATED_HEADERS = ["是否自动化", "关联接口", "用例测试类", "关联项目"]
+EMPTY_GENERATED_HEADERS = CPV_SPECIFIC_HEADERS
 
 # 生成耗时占位词：交付前必须按实际耗时回填
 DURATION_PLACEHOLDER_RE = re.compile(r"生成耗时：(?:待回填|约|预计)")
@@ -172,96 +187,7 @@ GENERATED_TIME_LINE_RE = re.compile(r"生成时间：([^\n\r]+)")
 GENERATED_TIME_FORMAT_RE = re.compile(r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$")
 
 # CPV 核心业务模块需要覆盖的关键场景关键词（任一同义词命中即算覆盖）
-CORE_FLOW_KEYWORDS = {
-    "年度计划": [
-        ["生效"],
-        ["生成任务", "周期性任务"],
-        ["状态", "流转"],
-    ],
-    "任务管理": [
-        ["执行", "提交"],
-        ["状态", "流转"],
-        ["关联方案", "方案"],
-    ],
-    "方案编制": [
-        ["审批", "审核", "批准"],
-        ["生效"],
-        ["监控项目", "报告"],
-    ],
-    "监控项目": [
-        ["分析", "数据分析"],
-        ["确认"],
-        ["报告", "结论"],
-    ],
-    "数据分析": [
-        ["导入", "数据源"],
-        ["字段", "配置"],
-        ["结果", "图表"],
-    ],
-    "一键分析": [
-        ["全部成功", "成功"],
-        ["部分失败", "失败"],
-        ["未分析原因", "未分析"],
-    ],
-    "报告编制": [
-        ["审批", "审核", "批准"],
-        ["生效"],
-        ["导出", "回推"],
-    ],
-    "权限管理": [
-        ["新增"],
-        ["编辑"],
-        ["删除", "批量删除"],
-        ["配置", "菜单权限", "按钮权限"],
-        ["停用", "启用"],
-    ],
-    "审计追踪": [
-        ["操作人"],
-        ["操作时间"],
-        ["操作类型"],
-        ["受影响对象"],
-        ["详情", "导出"],
-    ],
-}
-
-ONE_CLICK_REPAIR_INVALID_STATE_RE = re.compile(
-    r"(字段删减|字段缺失|字段不存在|字段匹配失败|字段未匹配|未匹配|匹配上定类变量|变量缺失|清空)"
-)
-ONE_CLICK_REPAIR_FIELD_RE = re.compile(r"(纵轴变量|横轴变量|子组大小|样本量字段|变量)")
-ONE_CLICK_REPAIR_FIELD_PRESERVED_RE = re.compile(
-    r"(字段仍保留|变量仍保留|仍保留在配置中|未被清空|未清空|没有清空)"
-)
-
-# 字段已被清空/删除/类型不匹配的失败场景关键词
-# 这类失败按"未分析项修复判定"不应生成"修复后一键分析成功"用例
-ONE_CLICK_FIELD_CLEARED_MARKERS = (
-    "字段删减", "字段缺失", "字段不存在", "字段有删减",
-    "字段匹配失败", "字段未匹配", "未匹配",
-    "匹配上定类变量", "为定类变量", "变为定类", "变定类",
-    "非定量",
-    "变量清空", "字段清空", "已清空",
-    "变量缺失",
-)
-
-# 从一键分析用例名称中剥离的结构性词汇（非原因关键词）
-ONE_CLICK_REASON_STRIP_RE = re.compile(
-    r"未分析的|未分析|一键分析|修复后|参与|成功|"
-    r"时|触发|异常提示|异常|提示|仍|保持|的|"
-    r"替换数据源|数据处理|执行|返回|确认|"
-    r"纵轴变量|横轴变量|子组大小|变量|"
-    r"[（）\(\)【】\[\]「」“”‘’\"'，,。.!！？?：:；;\s]"
-)
-
-# 分析方法名称（剥离原因核心时使用）
-ONE_CLICK_METHOD_RE = re.compile(
-    r"百分位数控制图|百分位数|"
-    r"NP控制图|P控制图|Xbar-S控制图|Xbar-R控制图|单值移动极差控制图|"
-    r"单值控制图|持续监控图|控制图|"
-    r"相关性帕累托排序图|相关性分析|帕累托图|"
-    r"拟合回归模型|拟合线图|箱线图|趋势图|单折线图|多折线图|"
-    r"双样本T检验|配对T检验|双样本等价检验|单因子方差分析|"
-    r"正态性检验|汇总报告图|多个Y值的单值图"
-)
+# 已迁移至 business_constants.CORE_FLOW_KEYWORDS，便于换项目时统一调整。
 
 
 def extract_one_click_reason(name: str) -> str:
@@ -350,6 +276,41 @@ def has_blocking_issues(issues: list[Issue], strict: bool = False) -> bool:
         issue.severity == "ERROR" or (strict and issue.severity == "WARN")
         for issue in issues
     )
+
+
+def run_all_validations(
+    case_files: list[Path],
+    cases: list[dict[str, str]],
+    parse_warnings: list[str] | None = None,
+) -> list[Issue]:
+    """运行完整校验规则集，返回所有 Issue。
+
+    校验链分两组：
+    - **通用校验**（表头、优先级、重复、分组相邻、元信息等）永远运行，与业务无关。
+    - **业务校验**（CPV 核心链路覆盖、一键分析专项）通过
+      ``business_constants.ENABLED_BUSINESS_RULES`` 开关按需加载，换项目时
+      可整体关闭或替换为新的业务规则（注册表见模块末尾 ``_BUSINESS_RULE_REGISTRY``）。
+    """
+    issues: list[Issue] = []
+    if parse_warnings:
+        issues.extend(
+            text_issue("ERROR", "parse_error", warning) for warning in parse_warnings
+        )
+    # 通用校验链：与业务无关，任何项目都需要
+    issues.extend(validate_case_rows(cases))
+    issues.extend(validate_group_priority_order(cases))
+    issues.extend(validate_ui_case_deduplication(cases))
+    issues.extend(validate_file_sources(case_files, cases))
+    issues.extend(validate_duplicates(cases))
+    issues.extend(validate_group_adjacency(cases))
+    issues.extend(validate_group_depth_consistency(cases))
+    issues.extend(validate_duration_metadata(case_files))
+    # 业务校验链：按 business_constants.ENABLED_BUSINESS_RULES 开关加载
+    for rule_name in ENABLED_BUSINESS_RULES:
+        validator = _BUSINESS_RULE_REGISTRY.get(rule_name)
+        if validator is not None:
+            issues.extend(validator(cases))
+    return issues
 
 
 def escape_markdown_cell(value: str) -> str:
@@ -1224,6 +1185,48 @@ def validate_data_analysis_one_click_rules(cases: list[dict[str, str]]) -> list[
     return issues
 
 
+def validate_group_depth_limit(cases: list[dict[str, str]]) -> list[Issue]:
+    """检查分组深度是否超过 MAX_GROUP_DEPTH 上限。
+
+    与 ``validate_group_depth_consistency``（"填到底"）配套：
+    - ``consistency`` 管"形状"——某级有值时更深层级也必须有值
+    - ``limit`` 管"上限"——某级超过 MAX_GROUP_DEPTH 时不允许填值
+
+    只检查"**有值**"的超限层级：表头声明了超限列但用例实际没填值不算违规
+    （那种情况由"禁止保留冗余的空分组列"规则处理）。
+    """
+    issues: list[Issue] = []
+    for case in cases:
+        for header in group_headers_from_case(case):
+            level = GROUP_HEADER_LEVELS.get(header, 0)
+            if level > MAX_GROUP_DEPTH and case.get(header, "").strip():
+                issues.append(
+                    case_issue(
+                        case,
+                        "ERROR",
+                        "group_depth_exceeded",
+                        f"分组层级超过上限：{header}（{level} 级）有值，"
+                        f"本项目最大分组深度为 {MAX_GROUP_DEPTH} 级；"
+                        f"更深层级的业务请拆分到独立输出文件或归并到上级分组",
+                        header,
+                    )
+                )
+                break  # 同条用例只报一次
+    return issues
+
+
+# CPV 业务校验插件注册表。
+# 通用校验（表头、优先级、重复、分组相邻、元信息等）在 run_all_validations 里
+# 无条件调用；业务校验通过 business_constants.ENABLED_BUSINESS_RULES 开关按需加载，
+# 换项目时可整体关闭、只保留其一，或在下方注册新的业务规则。
+# 新增业务校验时：写 validate_* 函数 → 在此注册 → 在 ENABLED_BUSINESS_RULES 加名字。
+_BUSINESS_RULE_REGISTRY = {
+    "core_flow_coverage": validate_core_flow_coverage,
+    "data_analysis_one_click": validate_data_analysis_one_click_rules,
+    "group_depth_limit": validate_group_depth_limit,
+}
+
+
 def validate_group_adjacency(cases: list[dict[str, str]]) -> list[Issue]:
     """检查同一文件内分组相邻性和一级分组聚集性。
 
@@ -1292,6 +1295,52 @@ def validate_group_adjacency(cases: list[dict[str, str]]) -> list[Issue]:
                 seen_l1[l1] = case
             prev_l1 = l1
 
+    return issues
+
+
+def validate_group_depth_consistency(cases: list[dict[str, str]]) -> list[Issue]:
+    """检查分组层级是否填到最深层级（一旦开始填值，必须填到底）。
+
+    规则依据 testcase_writing_guidelines.md：
+    某条用例的某级分组一旦有值，其所有更深层级分组列也必须有值。
+    即同一用例的分组深度必须填到底，不允许"三级分组有值、四级分组为空"
+    等中间层空值；不适用更深层级的用例应整体归并到上级分组。
+    """
+    issues: list[Issue] = []
+    for case in cases:
+        group_headers = group_headers_from_case(case)
+        if not group_headers:
+            continue
+        values = [case.get(header, "") for header in group_headers]
+        # 找到首个空值位置
+        first_empty_idx: int | None = None
+        for idx, value in enumerate(values):
+            if not value:
+                first_empty_idx = idx
+                break
+        if first_empty_idx is None:
+            continue  # 所有分组列都有值，通过
+        # 找到最深有值的层级
+        last_filled_idx = -1
+        for idx in range(len(values) - 1, -1, -1):
+            if values[idx]:
+                last_filled_idx = idx
+                break
+        if last_filled_idx < 0:
+            continue  # 全空（理论上不会，因为一级必填由其他规则处理）
+        empty_header = group_headers[first_empty_idx]
+        deepest_filled_header = group_headers[last_filled_idx]
+        issues.append(
+            case_issue(
+                case,
+                "ERROR",
+                "group_depth_inconsistent",
+                f"分组层级未填到底：{deepest_filled_header}有值但{empty_header}为空，"
+                f"某级分组有值时所有更深层级分组也必须有值；"
+                f"不适用更深层级的用例应整体归并到上级分组",
+                empty_header,
+            )
+        )
     return issues
 
 
@@ -1474,12 +1523,13 @@ def main(argv: list[str]) -> int:
         fixes = fix_case_files(case_files)
 
     cases: list[dict[str, str]] = []
-    issues: list[Issue] = []
+    parse_warnings: list[str] = []
     for case_file in case_files:
-        parsed_cases, parse_issues = parse_case_file(case_file)
+        parsed_cases, file_warnings = parse_case_file(case_file)
         cases.extend(parsed_cases)
-        issues.extend(text_issue("ERROR", "parse_error", issue) for issue in parse_issues)
+        parse_warnings.extend(file_warnings)
 
+    issues: list[Issue] = []
     if not cases:
         issues.append(text_issue("ERROR", "no_cases", "未解析到测试用例"))
         if args.json:
@@ -1488,15 +1538,7 @@ def main(argv: list[str]) -> int:
             print_text_report(case_files, cases, issues, args.summary_only, fixes)
         return 1
 
-    issues.extend(validate_case_rows(cases))
-    issues.extend(validate_group_priority_order(cases))
-    issues.extend(validate_ui_case_deduplication(cases))
-    issues.extend(validate_file_sources(case_files, cases))
-    issues.extend(validate_duplicates(cases))
-    issues.extend(validate_group_adjacency(cases))
-    issues.extend(validate_core_flow_coverage(cases))
-    issues.extend(validate_data_analysis_one_click_rules(cases))
-    issues.extend(validate_duration_metadata(case_files))
+    issues.extend(run_all_validations(case_files, cases, parse_warnings))
 
     if args.json:
         print_json_report(case_files, cases, issues, fixes)
