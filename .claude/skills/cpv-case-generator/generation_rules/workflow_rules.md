@@ -300,8 +300,7 @@ python scripts/validate_cases.py --source outputs/origin_exports/<site_type>/<mo
 - 难度标签 WARN 不阻断默认导出；如果要求 Markdown 源文件 0 WARN，必须根据 WARN 明细修复源文件。
 - 以下结构类规则已升为 **ERROR**（阻断导出），生成时必须保证满足：
   - `group_priority_order`：同级分组内用例必须按 P0 → P1 → P2 非降序排列
-  - `group_not_adjacent`：相同完整分组路径的用例必须连续，不得被其他分组打断
-  - `first_level_group_split`：同一一级分组下的所有用例必须聚集在连续区间内
+  - `group_not_adjacent`：一级、二级、三级等各级分组，相同分组名（含完整上级路径）必须相邻，不得被其他分组打断
   - `duplicate_flow`：同一分组内不得存在前置条件、用例步骤和预期结果完全相同或高度相近的重复用例
   - `step_too_long`：用例步骤单步不得超过 50 字
   - `precondition_too_long`：前置条件单条不得超过 50 字

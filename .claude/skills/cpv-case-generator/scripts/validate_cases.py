@@ -69,6 +69,7 @@ from case_utils import (
     DIFFICULTY_LEVELS,
     EXPECTED_HEADERS,
     GROUP_HEADER_LEVELS,
+    GROUP_HEADERS_BY_LEVEL,
     VALID_PRIORITIES,
     build_source_path,
     configure_output_encoding,
@@ -1228,11 +1229,11 @@ _BUSINESS_RULE_REGISTRY = {
 
 
 def validate_group_adjacency(cases: list[dict[str, str]]) -> list[Issue]:
-    """检查同一文件内分组相邻性和一级分组聚集性。
+    """检查同一文件内各级分组的相邻性。
 
     规则依据 testcase_writing_guidelines.md：
-    - 相同完整分组路径的用例必须连续放在一起，不得被其他分组路径用例打断。
-    - 同一一级分组下的所有用例必须聚集在连续区间内，不得被其他一级分组的用例打断。
+    - 一级、二级、三级等各级分组，相同分组名（含完整上级路径）必须相邻。
+    - 即：同一层级下、相同分组路径前缀的用例必须连续排列，不得被其他分组打断。
     """
     issues: list[Issue] = []
 
@@ -1245,55 +1246,54 @@ def validate_group_adjacency(cases: list[dict[str, str]]) -> list[Issue]:
         if len(file_cases) < 2:
             continue
 
-        # 检查 1：完整分组路径相邻性
-        seen_full_path: dict[str, dict[str, str]] = {}
-        prev_full_path: str | None = None
+        # 计算本文件实际用到的最大分组深度
+        max_depth = 0
         for case in file_cases:
-            full_path = case_group(case)
-            if (
-                full_path in seen_full_path
-                and prev_full_path != full_path
-                and prev_full_path is not None
-            ):
-                first_case = seen_full_path[full_path]
-                first_line = first_case.get("_source_line", "")
-                issues.append(
-                    case_issue(
-                        case,
-                        "ERROR",
-                        "group_not_adjacent",
-                        f"分组 [{full_path}] 与第 {first_line} 行的同名分组不相邻，中间被其他分组打断；"
-                        "相同完整分组路径的用例必须连续排列",
-                        "分组",
-                    )
-                )
-            if full_path not in seen_full_path:
-                seen_full_path[full_path] = case
-            prev_full_path = full_path
+            for header in group_headers_from_case(case):
+                if case.get(header, "").strip():
+                    level = GROUP_HEADER_LEVELS.get(header, 0)
+                    if level > max_depth:
+                        max_depth = level
+        if max_depth == 0:
+            continue
 
-        # 检查 2：一级分组聚集性
-        seen_l1: dict[str, dict[str, str]] = {}
-        prev_l1: str | None = None
-        for case in file_cases:
-            l1 = case.get("一级分组", "")
-            if not l1:
-                continue
-            if l1 in seen_l1 and prev_l1 != l1 and prev_l1 is not None:
-                first_case = seen_l1[l1]
-                first_line = first_case.get("_source_line", "")
-                issues.append(
-                    case_issue(
-                        case,
-                        "ERROR",
-                        "first_level_group_split",
-                        f"一级分组 [{l1}] 与第 {first_line} 行的同名一级分组不相邻，被其他一级分组打断；"
-                        "同一一级分组下的所有用例必须聚集在连续区间内",
-                        "一级分组",
-                    )
+        # 逐级检查：level=1 检查一级分组聚集性，level=2 检查同一一级分组下
+        # 二级分组相邻性，依此类推到 max_depth（最深一级等价于完整路径相邻性）。
+        for level in range(1, max_depth + 1):
+            level_header = GROUP_HEADERS_BY_LEVEL.get(level, f"{level}级分组")
+            seen_prefix: dict[tuple[str, ...], dict[str, str]] = {}
+            prev_prefix: tuple[str, ...] | None = None
+            for case in file_cases:
+                # 构建到当前层级的分组前缀（一级到本级）
+                prefix = tuple(
+                    case.get(GROUP_HEADERS_BY_LEVEL.get(l, ""), "")
+                    for l in range(1, level + 1)
                 )
-            if l1 not in seen_l1:
-                seen_l1[l1] = case
-            prev_l1 = l1
+                # 当前层级无值时跳过（浅层用例不参与深层相邻性检查）
+                if not prefix[-1]:
+                    prev_prefix = prefix
+                    continue
+                if (
+                    prefix in seen_prefix
+                    and prev_prefix != prefix
+                    and prev_prefix is not None
+                ):
+                    first_case = seen_prefix[prefix]
+                    first_line = first_case.get("_source_line", "")
+                    prefix_label = " / ".join(part for part in prefix if part)
+                    issues.append(
+                        case_issue(
+                            case,
+                            "ERROR",
+                            "group_not_adjacent",
+                            f"分组 [{prefix_label}] 与第 {first_line} 行的同名分组不相邻，"
+                            f"中间被其他分组打断；{level_header}相同的用例必须连续排列",
+                            level_header,
+                        )
+                    )
+                if prefix not in seen_prefix:
+                    seen_prefix[prefix] = case
+                prev_prefix = prefix
 
     return issues
 
