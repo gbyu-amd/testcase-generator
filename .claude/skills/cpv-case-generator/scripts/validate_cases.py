@@ -66,6 +66,8 @@ from business_constants import (
     ONE_CLICK_REPAIR_INVALID_STATE_RE,
 )
 from case_utils import (
+    ALL_VALID_TAGS,
+    CHANGE_TAGS,
     DIFFICULTY_LEVELS,
     EXPECTED_HEADERS,
     GROUP_HEADER_LEVELS,
@@ -708,6 +710,19 @@ def validate_case_rows(cases: list[dict[str, str]]) -> list[Issue]:
                     "WARN",
                     "multiple_difficulty_tags",
                     f"用例标签中存在多个难度等级：{'、'.join(difficulty_tags)}，仅应保留 {expected_difficulty}{difficulty_reason_text}",
+                    "用例标签",
+                )
+            )
+
+        unknown_tags = [tag for tag in tags if tag not in ALL_VALID_TAGS]
+        if unknown_tags:
+            issues.append(
+                case_issue(
+                    case,
+                    "WARN",
+                    "unknown_case_tag",
+                    f"用例标签存在非约定值：{'、'.join(unknown_tags)}；"
+                    f"只允许难度等级（简单/一般/困难）和变更类标记（{'/'.join(CHANGE_TAGS)}）",
                     "用例标签",
                 )
             )

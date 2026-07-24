@@ -69,6 +69,10 @@ REQUIRED_HEADERS = DEFAULT_GROUP_HEADERS + REQUIRED_FIXED_HEADERS
 
 VALID_PRIORITIES = {"P0", "P1", "P2"}
 DIFFICULTY_LEVELS = ("简单", "一般", "困难")
+# 需求版本变更类标记，可与难度等级并存于用例标签（用分号分隔）。
+# 触发场景见 workflow_rules.md「PRD 版本变更与用例检查」。
+CHANGE_TAGS = ("需求变更", "需求遗漏")
+ALL_VALID_TAGS = DIFFICULTY_LEVELS + CHANGE_TAGS
 
 
 def is_group_header(header: str) -> bool:
@@ -582,7 +586,22 @@ def infer_case_difficulty(case: dict[str, str]) -> str:
 
 
 def merge_difficulty_tag(existing_tags: str, difficulty: str) -> str:
-    """用例标签只保留难度等级。"""
+    """合并难度等级与已有标签，保留需求变更类标记。
+
+    用例标签 = 难度等级（唯一）+ 已有的需求变更类标记（需求变更 / 需求遗漏）。
+    其他非难度标签在导出时会被清理，避免历史遗留标签污染输出。
+    """
+    tags = split_case_tags(existing_tags)
+    preserved = [tag for tag in tags if tag in CHANGE_TAGS]
+    # 去重，保持首次出现顺序
+    seen: set[str] = set()
+    unique_preserved: list[str] = []
+    for tag in preserved:
+        if tag not in seen:
+            seen.add(tag)
+            unique_preserved.append(tag)
+    if unique_preserved:
+        return difficulty + "；" + "；".join(unique_preserved)
     return difficulty
 
 
